@@ -32,7 +32,7 @@ export default function AuthPage() {
       <div className="hidden lg:flex lg:w-[55%] relative overflow-hidden">
         <img
           src="/clinic-room.jpg"
-          alt="Medique Clinic"
+          alt="Aura Vita Clinic"
           className="absolute inset-0 w-full h-full object-cover"
         />
         {/* Warm dark overlay */}
@@ -57,7 +57,7 @@ export default function AuthPage() {
 
           <div className="flex items-center gap-3">
             <div className="w-8 h-[1px] bg-white/20" />
-            <p className="text-white/30 text-xs tracking-widest">MEDIQUE CLINIC · TIRANË</p>
+            <p className="text-white/30 text-xs tracking-widest">AURA VITA CLINIC · TIRANË</p>
           </div>
         </div>
       </div>
@@ -146,7 +146,7 @@ export default function AuthPage() {
         {/* Bottom brand mark */}
         <div className="mt-auto pt-12 flex items-center gap-2 opacity-30">
           <div className="w-4 h-[1px] bg-current" />
-          <span className="text-[10px] tracking-[0.2em] uppercase font-medium">Medique CRM</span>
+          <span className="text-[10px] tracking-[0.2em] uppercase font-medium">Aura Vita CRM</span>
           <div className="w-4 h-[1px] bg-current" />
         </div>
       </div>

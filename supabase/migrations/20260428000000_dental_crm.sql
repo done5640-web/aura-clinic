@@ -14,16 +14,16 @@ UPDATE public.pipeline_stages SET name = 'Konfirmuar – Vizitë',   color = '#1
 UPDATE public.pipeline_stages SET name = 'Trajtim në Kurs',       color = '#a855f7' WHERE name = 'Closed Won';
 UPDATE public.pipeline_stages SET name = 'Mbyllur – Pa Interes',  color = '#ef4444' WHERE name = 'Closed Lost';
 
--- ── Super admin: lediomema31@gmail.com ───────────────────────────────────────
+-- ── Super admin: pamela@auravitaclinic.al ────────────────────────────────────
 DO $$
 DECLARE
   v_user_id UUID;
 BEGIN
-  SELECT id INTO v_user_id FROM auth.users WHERE email = 'lediomema31@gmail.com' LIMIT 1;
+  SELECT id INTO v_user_id FROM auth.users WHERE email = 'pamela@auravitaclinic.al' LIMIT 1;
   IF v_user_id IS NOT NULL THEN
     INSERT INTO public.profiles (id, email, full_name)
-    VALUES (v_user_id, 'lediomema31@gmail.com', 'Ledion Emema')
-    ON CONFLICT (id) DO UPDATE SET full_name = 'Ledion Emema', company_id = NULL;
+    VALUES (v_user_id, 'pamela@auravitaclinic.al', 'Pamela Admin')
+    ON CONFLICT (id) DO UPDATE SET full_name = 'Pamela Admin', company_id = NULL;
 
     INSERT INTO public.user_roles (user_id, role, company_id)
     VALUES (v_user_id, 'super_admin', NULL)

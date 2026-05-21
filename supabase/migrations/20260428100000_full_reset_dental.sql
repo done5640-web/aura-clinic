@@ -28,9 +28,9 @@ DELETE FROM auth.users WHERE email LIKE '%@dentaltirana.com'
 UPDATE auth.users SET
   encrypted_password = crypt('Demo1234!', gen_salt('bf')),
   email_confirmed_at = now(),
-  raw_user_meta_data = '{"full_name":"Ledio Mema"}',
+  raw_user_meta_data = '{"full_name":"Pamela Admin"}',
   updated_at = now()
-WHERE email = 'ledionmema31@gmail.com';
+WHERE email = 'pamela@auravitaclinic.al';
 
 -- Create all users using select from auth.users as template (copies instance_id etc)
 INSERT INTO auth.users (
@@ -69,7 +69,7 @@ FROM (VALUES
   ('op2@brightsmile.com',    'Yllka Qosja'),
   ('op3@brightsmile.com',    'Zamira Loshi')
 ) AS u(new_email, full_name)
-CROSS JOIN (SELECT instance_id, aud, role FROM auth.users WHERE email='ledionmema31@gmail.com' LIMIT 1) AS tmpl;
+CROSS JOIN (SELECT instance_id, aud, role FROM auth.users WHERE email='pamela@auravitaclinic.al' LIMIT 1) AS tmpl;
 
 -- ═══════════════════════════════════════════════════════════════════
 -- STEP 2: Seed companies, roles, leads
@@ -85,7 +85,7 @@ DECLARE
   u_a2  UUID; u_tl3 UUID; u_tl4 UUID; u_op4 UUID; u_op5 UUID; u_op6 UUID;
   u_a3  UUID; u_tl5 UUID; u_tl6 UUID; u_op7 UUID; u_op8 UUID; u_op9 UUID;
 BEGIN
-  SELECT id INTO u_sa  FROM auth.users WHERE email='ledionmema31@gmail.com';
+  SELECT id INTO u_sa  FROM auth.users WHERE email='pamela@auravitaclinic.al';
   SELECT id INTO u_a1  FROM auth.users WHERE email='admin@dentaltirana.com';
   SELECT id INTO u_tl1 FROM auth.users WHERE email='tl1@dentaltirana.com';
   SELECT id INTO u_tl2 FROM auth.users WHERE email='tl2@dentaltirana.com';
@@ -106,7 +106,7 @@ BEGIN
   SELECT id INTO u_op9 FROM auth.users WHERE email='op3@brightsmile.com';
 
   -- Super admin
-  INSERT INTO public.profiles (id,email,full_name) VALUES (u_sa,'ledionmema31@gmail.com','Ledio Mema') ON CONFLICT (id) DO UPDATE SET full_name='Ledio Mema',company_id=NULL;
+  INSERT INTO public.profiles (id,email,full_name) VALUES (u_sa,'pamela@auravitaclinic.al','Pamela Admin') ON CONFLICT (id) DO UPDATE SET full_name='Pamela Admin',company_id=NULL;
   INSERT INTO public.user_roles (user_id,role,company_id) VALUES (u_sa,'super_admin',NULL) ON CONFLICT DO NOTHING;
 
   -- ── COMPANY 1: Dental Tirana ────────────────────────────────────
