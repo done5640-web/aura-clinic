@@ -1,0 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Josefin+Sans:wght@300;400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm cream/stone base — matches clinic walls */
+    --background: 36 20% 97%;
+    --foreground: 25 15% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 25 15% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 25 15% 14%;
+
+    /* Primary: warm dark stone/charcoal — like the clinic logo on walls */
+    --primary: 25 12% 26%;
+    --primary-foreground: 36 20% 97%;
+
+    --secondary: 30 20% 93%;
+    --secondary-foreground: 25 15% 20%;
+
+    --muted: 30 15% 93%;
+    --muted-foreground: 25 10% 48%;
+
+    /* Accent: warm gold/amber — the cognac chair, warm lighting */
+    --accent: 38 62% 52%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 42%;
+    --warning: 38 92% 50%;
+
+    --border: 30 15% 87%;
+    --input: 30 15% 87%;
+    --ring: 38 62% 52%;
+    --radius: 0.75rem;
+
+    /* Sidebar: deep warm charcoal — clinic's dark branding */
+    --sidebar-background: 25 18% 10%;
+    --sidebar-foreground: 30 15% 62%;
+    --sidebar-accent: 25 15% 16%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 25 15% 14%;
+  }
+
+  .dark {
+    --background: 25 15% 8%;
+    --foreground: 36 20% 94%;
+    --card: 25 12% 11%;
+    --card-foreground: 36 20% 94%;
+    --popover: 25 12% 11%;
+    --popover-foreground: 36 20% 94%;
+    --primary: 38 62% 56%;
+    --primary-foreground: 25 15% 8%;
+    --secondary: 25 12% 18%;
+    --secondary-foreground: 36 20% 80%;
+    --muted: 25 12% 18%;
+    --muted-foreground: 30 10% 55%;
+    --accent: 38 62% 52%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 25 12% 19%;
+    --input: 25 12% 19%;
+    --ring: 38 62% 52%;
+
+    --sidebar-background: 25 18% 6%;
+    --sidebar-foreground: 30 12% 58%;
+    --sidebar-accent: 25 15% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 25 15% 10%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; box-sizing: border-box; }
+  html { font-family: 'Inter', system-ui, sans-serif; scroll-behavior: smooth; }
+  body { @apply bg-background text-foreground antialiased; }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/30; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[hsl(25_12%_26%)] hover:bg-[hsl(25_12%_20%)] text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors shadow-sm;
+  }
+
+  .card-base {
+    @apply bg-card rounded-xl border border-border shadow-sm;
+  }
+
+  .stat-card {
+    @apply bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors;
+  }
+
+  .nav-link-active {
+    @apply bg-white/10 text-white;
+  }
+
+  .nav-link-inactive {
+    @apply text-[hsl(var(--sidebar-foreground))] hover:bg-white/5 hover:text-white;
+  }
+
+  .table-row-hover {
+    @apply hover:bg-muted/40 transition-colors cursor-pointer;
+  }
+
+  .badge-status {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold tracking-tight text-foreground;
+  }
+
+  .label-sm {
+    @apply text-xs font-medium text-muted-foreground uppercase tracking-wider;
+  }
+}
