@@ -168,7 +168,6 @@ export default function Team() {
     setAddBusy(true);
 
     const { data: { session } } = await supabase.auth.getSession();
-    console.log("session token:", session?.access_token?.slice(0, 20));
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL ?? "https://yaoaulvxrxgcitbfpapy.supabase.co"}/functions/v1/create-user`, {
       method: "POST",
       headers: {
@@ -185,9 +184,8 @@ export default function Team() {
       }),
     });
     const resData = await res.json();
-    console.error("create-user response:", res.status, resData);
     if (!res.ok || resData?.error) {
-      toast.error(resData?.error ?? `Gabim (${res.status}): ${JSON.stringify(resData)}`);
+      toast.error(resData?.error ?? "Gabim në krijimin e anëtarit");
       setAddBusy(false);
       return;
     }

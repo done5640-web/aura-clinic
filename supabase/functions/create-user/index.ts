@@ -11,18 +11,6 @@ const ASSIGNABLE_ROLES: Record<string, string[]> = {
   team_leader:   ["operator"],
 };
 
-function decodeJWT(token: string): any {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = atob(payload);
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -34,18 +22,18 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    // Decode JWT to get user id without algorithm verification
-    const payload = decodeJWT(token);
-    if (!payload?.sub) {
-      return new Response(JSON.stringify({ error: "Unauthorized: invalid token" }), { status: 401, headers: corsHeaders });
-    }
-    const callerId = payload.sub;
-
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
+
+    // Properly verify the JWT via Supabase — rejects forged/expired tokens
+    const { data: { user: caller }, error: authErr } = await serviceClient.auth.getUser(token);
+    if (authErr || !caller) {
+      return new Response(JSON.stringify({ error: "Unauthorized: invalid token" }), { status: 401, headers: corsHeaders });
+    }
+    const callerId = caller.id;
 
     // Get caller's roles from DB
     const { data: roles } = await serviceClient
@@ -75,6 +63,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Nuk mund të caktoni këtë rol" }), { status: 403, headers: corsHeaders });
     }
 
+    // Non-super-admins are always locked to their own company
     const company_id = callerRole.role === "super_admin"
       ? (body.company_id || null)
       : callerRole.company_id;
