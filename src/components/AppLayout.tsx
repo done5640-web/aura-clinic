@@ -173,21 +173,29 @@ export default function AppLayout() {
         </header>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t z-20 flex">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t z-20 flex safe-area-pb">
           {items.slice(0, 5).map((it) => (
             <NavLink key={it.to + it.label} to={it.to} end={it.to === "/admin" || it.to === "/dashboard"}
               className={({ isActive }) => cn(
-                "flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-medium transition-colors",
-                isActive ? "text-indigo-600" : "text-muted-foreground"
+                "flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[9px] font-medium transition-colors",
+                isActive
+                  ? "text-[hsl(38,62%,52%)]"
+                  : "text-muted-foreground"
               )}>
-              <it.icon className="w-4 h-4" />
-              <span className="truncate max-w-[56px]">{it.label}</span>
+              {({ isActive }) => (
+                <>
+                  <div className={cn("p-1.5 rounded-lg transition-colors", isActive && "bg-[hsl(38,62%,52%)]/10")}>
+                    <it.icon className="w-4 h-4" />
+                  </div>
+                  <span className="truncate max-w-[56px]">{it.label}</span>
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
 
         {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6 overflow-auto" key={location.pathname}>
+        <main className="flex-1 p-3 md:p-6 pb-24 md:pb-6 overflow-auto" key={location.pathname}>
           <div className="max-w-7xl mx-auto w-full">
             <Outlet />
           </div>

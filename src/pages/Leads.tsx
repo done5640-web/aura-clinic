@@ -192,7 +192,7 @@ export default function Leads() {
 
   useEffect(() => {
     if (!primaryRole) return;
-    if ((primaryRole === "company_admin" || primaryRole === "team_leader") && !companyId) return;
+    if (primaryRole !== "super_admin" && !companyId) return;
     loadCancelRef.current = true;
     load(primaryRole, companyId);
   }, [companyId, primaryRole]);

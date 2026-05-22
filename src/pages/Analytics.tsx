@@ -9,7 +9,7 @@ import { fetchAll } from "@/lib/fetchAll";
 const COLORS = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#3b82f6"];
 
 export default function Analytics() {
-  const { companyId } = useAuth();
+  const { companyId, primaryRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stageValue, setStageValue] = useState<any[]>([]);
   const [sources, setSources] = useState<any[]>([]);
@@ -17,12 +17,23 @@ export default function Analytics() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!companyId) return;
+    if (primaryRole !== "super_admin" && !companyId) return;
     (async () => {
-      const [leads, { data: stages }, { data: profs }] = await Promise.all([
-        fetchAll((f, t) => supabase.from("leads").select("value, source, pipeline_stage_id, assigned_to_user_id, pipeline_stages(name, order)").eq("company_id", companyId).range(f, t)),
-        supabase.from("pipeline_stages").select("*").order("order"),
-        supabase.from("profiles").select("id, full_name, email").eq("company_id", companyId),
+      let resolvedCompanyId = companyId;
+      if (!resolvedCompanyId) {
+        const { data } = await supabase.from("companies").select("id").limit(1).single();
+        resolvedCompanyId = data?.id ?? null;
+      }
+      if (!resolvedCompanyId) { setLoading(false); return; }
+      loadAnalytics(resolvedCompanyId);
+    })();
+  }, [companyId, primaryRole]);
+
+  const loadAnalytics = async (cid: string) => {
+    const [leads, { data: stages }, { data: profs }] = await Promise.all([
+        fetchAll((f, t) => supabase.from("leads").select("value, source, pipeline_stage_id, assigned_to_user_id, pipeline_stages(name, order)").eq("company_id", cid).range(f, t)),
+        supabase.from("pipeline_stages").select("*").eq("company_id", cid).order("order"),
+        supabase.from("profiles").select("id, full_name, email").eq("company_id", cid),
       ]);
       const stageMap = new Map<string, { name: string; count: number; value: number; order: number }>();
       (stages ?? []).forEach((s: any) => stageMap.set(s.id, { name: s.name, count: 0, value: 0, order: s.order }));
@@ -50,8 +61,7 @@ export default function Analytics() {
         return { ...p, ...u };
       }).sort((a, b) => b.value - a.value));
       setLoading(false);
-    })();
-  }, [companyId]);
+  };
 
   if (loading) return <div className="grid grid-cols-2 gap-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-72" />)}</div>;
 
