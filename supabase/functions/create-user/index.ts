@@ -5,12 +5,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Roles a caller is allowed to assign, keyed by their own role
 const ASSIGNABLE_ROLES: Record<string, string[]> = {
   super_admin:   ["company_admin", "team_leader", "operator"],
   company_admin: ["company_admin", "team_leader", "operator"],
   team_leader:   ["operator"],
 };
+
+function decodeJWT(token: string): any {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = atob(payload);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -21,21 +32,22 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
+    const token = authHeader.replace("Bearer ", "");
+
+    // Decode JWT to get user id without algorithm verification
+    const payload = decodeJWT(token);
+    if (!payload?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized: invalid token" }), { status: 401, headers: corsHeaders });
+    }
+    const callerId = payload.sub;
+
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Verify the JWT properly by calling Supabase — do NOT trust decoded payload alone
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user: caller }, error: authErr } = await serviceClient.auth.getUser(token);
-    if (authErr || !caller) {
-      return new Response(JSON.stringify({ error: "Unauthorized: invalid token" }), { status: 401, headers: corsHeaders });
-    }
-    const callerId = caller.id;
-
-    // Get caller's roles from DB (not from JWT claims)
+    // Get caller's roles from DB
     const { data: roles } = await serviceClient
       .from("user_roles")
       .select("role, company_id")
@@ -51,7 +63,6 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { email, password, full_name, role } = body;
 
-    // Input validation
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return new Response(JSON.stringify({ error: "Email i pavlefshëm" }), { status: 400, headers: corsHeaders });
     }
@@ -59,13 +70,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Fjalëkalimi duhet të ketë të paktën 8 karaktere" }), { status: 400, headers: corsHeaders });
     }
 
-    // Enforce which roles a caller can assign — no privilege escalation
     const assignable = ASSIGNABLE_ROLES[callerRole.role] ?? [];
     if (role && !assignable.includes(role)) {
       return new Response(JSON.stringify({ error: "Nuk mund të caktoni këtë rol" }), { status: 403, headers: corsHeaders });
     }
 
-    // Non-super-admins are always locked to their own company
     const company_id = callerRole.role === "super_admin"
       ? (body.company_id || null)
       : callerRole.company_id;

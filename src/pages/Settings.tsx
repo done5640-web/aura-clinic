@@ -14,7 +14,8 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 export default function Settings() {
   const { user, primaryRole, companyId, fullName, email, refresh } = useAuth();
   const [name, setName] = useState(fullName ?? "");
-  const isAdmin = primaryRole === "company_admin";
+  const isAdmin = primaryRole === "company_admin" || primaryRole === "super_admin";
+  const showCompanyTab = primaryRole === "company_admin";
   const isAdminOrLeader = primaryRole === "company_admin" || primaryRole === "team_leader";
 
   useEffect(() => { setName(fullName ?? ""); }, [fullName]);
@@ -31,7 +32,7 @@ export default function Settings() {
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">Profili</TabsTrigger>
-          {isAdmin && <TabsTrigger value="company">Klinika</TabsTrigger>}
+          {showCompanyTab && <TabsTrigger value="company">Klinika</TabsTrigger>}
           {isAdmin && <TabsTrigger value="pipeline">Statuset</TabsTrigger>}
           {isAdminOrLeader && <TabsTrigger value="integrations">Integrimi</TabsTrigger>}
         </TabsList>
@@ -45,7 +46,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
-        {isAdmin && companyId && <TabsContent value="company"><CompanyProfile companyId={companyId} /></TabsContent>}
+        {showCompanyTab && companyId && <TabsContent value="company"><CompanyProfile companyId={companyId} /></TabsContent>}
         {isAdmin && companyId && <TabsContent value="pipeline"><PipelineEditor companyId={companyId} /></TabsContent>}
         {isAdminOrLeader && companyId && <TabsContent value="integrations"><Integrations companyId={companyId} /></TabsContent>}
       </Tabs>

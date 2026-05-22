@@ -31,7 +31,7 @@ export default function AuthPage() {
       {/* Left panel — clinic photo */}
       <div className="hidden lg:flex lg:w-[55%] relative overflow-hidden">
         <img
-          src="/clinic-room.jpg"
+          src="/dentis.jpeg"
           alt="Aura Vita Clinic"
           className="absolute inset-0 w-full h-full object-cover"
         />

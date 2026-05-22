@@ -32,9 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = async (uid: string, retries = 5): Promise<void> => {
     const [{ data: profile }, { data: roleRows, error: roleErr }] = await Promise.all([
       supabase.from("profiles").select("company_id, full_name").eq("id", uid).maybeSingle(),
-      supabase.from("user_roles").select("role").eq("user_id", uid),
+      supabase.from("user_roles").select("role, company_id").eq("user_id", uid),
     ]);
-    setCompanyId(profile?.company_id ?? null);
+    const companyIdFromProfile = profile?.company_id ?? null;
+    const companyIdFromRoles = (roleRows ?? []).find((r: any) => r.company_id)?.company_id ?? null;
+    setCompanyId(companyIdFromProfile ?? companyIdFromRoles);
     setFullName(profile?.full_name ?? null);
     const fetchedRoles = ((roleRows ?? []).map((r) => r.role)) as AppRole[];
     // If roles came back empty and we have retries left, wait and retry

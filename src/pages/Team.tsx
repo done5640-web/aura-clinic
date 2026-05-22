@@ -157,12 +157,19 @@ export default function Team() {
   const addMember = async () => {
     if (!addForm.email.trim()) return toast.error("Email është i detyrueshëm");
     if (addForm.password.length < 8) return toast.error("Fjalëkalimi min. 8 karaktere");
-    const targetCompany = isSuperAdmin ? addForm.company_id : companyId;
-    if (!targetCompany) return toast.error("Zgjidh një klinikë");
+
+    let targetCompany = companyId ?? companies[0]?.id;
+    if (!targetCompany) {
+      const { data } = await supabase.from("companies").select("id").limit(1).single();
+      targetCompany = data?.id;
+    }
+    if (!targetCompany) return toast.error("Nuk u gjet klinika");
+
     setAddBusy(true);
 
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch("https://fvpoezndsgtubfehbkol.supabase.co/functions/v1/create-user", {
+    console.log("session token:", session?.access_token?.slice(0, 20));
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL ?? "https://yaoaulvxrxgcitbfpapy.supabase.co"}/functions/v1/create-user`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -178,8 +185,9 @@ export default function Team() {
       }),
     });
     const resData = await res.json();
+    console.error("create-user response:", res.status, resData);
     if (!res.ok || resData?.error) {
-      toast.error(resData?.error ?? "Gabim në krijimin e anëtarit");
+      toast.error(resData?.error ?? `Gabim (${res.status}): ${JSON.stringify(resData)}`);
       setAddBusy(false);
       return;
     }
@@ -254,7 +262,7 @@ export default function Team() {
   const removeMember = async () => {
     if (!confirmMember) return;
     await supabase.from("user_roles").delete().eq("user_id", confirmMember.id);
-    await supabase.from("profiles").update({ company_id: null }).eq("id", confirmMember.id);
+    await supabase.from("profiles").delete().eq("id", confirmMember.id);
     setConfirmMember(null);
     toast.success("Anëtari u hoq");
     load();
@@ -262,21 +270,11 @@ export default function Team() {
 
   if (loading) return <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>;
 
-  // Group by company for super_admin
-  const byCompany = new Map<string, Member[]>();
-  if (isSuperAdmin) {
-    members.forEach((m) => {
-      const key = m.company_name ?? "Pa klinikë";
-      if (!byCompany.has(key)) byCompany.set(key, []);
-      byCompany.get(key)!.push(m);
-    });
-  }
-
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{isSuperAdmin ? "Të gjithë anëtarët" : "Ekipi"}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Ekipi</h1>
           <div className="flex items-center gap-3 mt-0.5">
             <p className="text-sm text-muted-foreground">{members.length} anëtarë</p>
             {unassignedLeads > 0 && (
@@ -316,15 +314,6 @@ export default function Team() {
                 </SelectContent>
               </Select>
             </div>
-            {isSuperAdmin && (
-              <div>
-                <Label>Klinika *</Label>
-                <Select value={addForm.company_id} onValueChange={(v) => setAddForm({ ...addForm, company_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Zgjidh klinikën" /></SelectTrigger>
-                  <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            )}
             {(primaryRole === "company_admin" || isSuperAdmin) && addForm.role === "operator" && teamLeaders.length > 0 && (
               <div>
                 <Label>Team Leader</Label>
@@ -390,24 +379,6 @@ export default function Team() {
               </div>
             )}
 
-            {/* Company assignment — super_admin only */}
-            {isSuperAdmin && (
-              <div>
-                <Label>Klinika</Label>
-                <Select
-                  value={editForm.company_id || "__none__"}
-                  onValueChange={(v) => setEditForm({ ...editForm, company_id: v === "__none__" ? "" : v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Pa klinikë" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— Pa klinikë —</SelectItem>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             {editForm.role === "operator" && teamLeaders.length === 0 && (
               <p className="text-sm text-muted-foreground">Nuk ka team leaders në këtë kompani.</p>
@@ -423,29 +394,14 @@ export default function Team() {
         </DialogContent>
       </Dialog>
 
-      {/* Member lists */}
-      {isSuperAdmin ? (
-        Array.from(byCompany.entries()).map(([companyName, list]) => (
-          <div key={companyName}>
-            <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">{companyName}</h2>
-            <MemberList
-              members={list}
-              canManage={canManageTeam}
-              teamLeaders={teamLeaders}
-              onRemove={(m) => setConfirmMember(m)}
-              onEdit={openEdit}
-            />
-          </div>
-        ))
-      ) : (
-        <MemberList
-          members={members}
-          canManage={canManageTeam}
-          teamLeaders={teamLeaders}
-          onRemove={(m) => setConfirmMember(m)}
-          onEdit={openEdit}
-        />
-      )}
+      {/* Member list */}
+      <MemberList
+        members={members}
+        canManage={canManageTeam}
+        teamLeaders={teamLeaders}
+        onRemove={(m) => setConfirmMember(m)}
+        onEdit={openEdit}
+      />
       <ConfirmDialog
         open={!!confirmMember}
         title="Hiq nga ekipi"
