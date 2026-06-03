@@ -47,7 +47,7 @@ function parseXLSX(buffer: ArrayBuffer): { headers: string[]; rows: string[][] }
   // header: 1 → returns array of arrays; defval: "" fills empty cells
   const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
   if (data.length === 0) return { headers: [], rows: [] };
-  const headers = data[0].map((h: any) => String(h ?? "").trim());
+  const headers = data[0].map((h: any) => String(h ?? "").trim()).filter((h) => h !== "");
   const rows = data.slice(1)
     .filter((r) => r.some((c: any) => String(c ?? "").trim() !== ""))
     .map((r) => r.map((c: any) => String(c ?? "").trim()));
