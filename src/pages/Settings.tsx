@@ -59,15 +59,25 @@ function CompanyProfile({ companyId }: { companyId: string }) {
   useEffect(() => { supabase.from("companies").select("*").eq("id", companyId).maybeSingle().then(({ data }) => setC(data)); }, [companyId]);
   if (!c) return null;
   const save = async () => {
-    const { error } = await supabase.from("companies").update({ name: c.name, logo_url: c.logo_url }).eq("id", c.id);
+    const { error } = await supabase.from("companies").update({
+      name: c.name, logo_url: c.logo_url,
+      phone: c.phone, email: c.email, website: c.website, address: c.address,
+    }).eq("id", c.id);
     if (error) toast.error(error.message); else toast.success("Ruajtur");
   };
   return (
     <Card>
-      <CardHeader><CardTitle>Klinika</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle>Klinika</CardTitle>
+        <CardDescription>Këto të dhëna shfaqen edhe në fund të çdo Preventivi (PDF).</CardDescription>
+      </CardHeader>
       <CardContent className="space-y-3 max-w-md">
         <div><Label>Emri i klinikës</Label><Input value={c.name} onChange={(e) => setC({ ...c, name: e.target.value })} /></div>
         <div><Label>URL e logos</Label><Input value={c.logo_url ?? ""} onChange={(e) => setC({ ...c, logo_url: e.target.value })} /></div>
+        <div><Label>Adresa</Label><Input value={c.address ?? ""} onChange={(e) => setC({ ...c, address: e.target.value })} placeholder="p.sh. Tiranë, Shqipëri" /></div>
+        <div><Label>Telefoni</Label><Input value={c.phone ?? ""} onChange={(e) => setC({ ...c, phone: e.target.value })} placeholder="+355..." /></div>
+        <div><Label>Email</Label><Input value={c.email ?? ""} onChange={(e) => setC({ ...c, email: e.target.value })} placeholder="info@klinika.com" /></div>
+        <div><Label>Website</Label><Input value={c.website ?? ""} onChange={(e) => setC({ ...c, website: e.target.value })} placeholder="https://..." /></div>
         <div><Label>Plani</Label><Input value={c.plan} disabled /></div>
         <Button onClick={save}>Ruaj</Button>
       </CardContent>

@@ -15,6 +15,7 @@ import {
   Phone, Mail, Wrench, Clock, Euro, User, Upload,
   Trash2, FileText, ImageIcon, File as FileIcon, Plus, StickyNote,
   PhoneCall, CalendarCheck, RefreshCw, CheckSquare, CalendarDays, Pencil,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import { recentStatusChanges } from "@/lib/recentStatusChanges";
 import PhoneInput from "@/components/PhoneInput";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { stageColorClass } from "@/lib/stage-colors";
+import { compressForUpload } from "@/lib/compressFile";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   note: "Shënim", call: "Telefonatë", email: "Email",
@@ -44,6 +46,7 @@ const TABS = [
   { key: "tasks",      label: "Detyra" },
   { key: "calendar",   label: "Telefonata" },
   { key: "files",      label: "Skedarë" },
+  { key: "quotes",     label: "Preventiva" },
 ];
 
 
@@ -69,6 +72,7 @@ export default function LeadDetail() {
   const [tasks, setTasks]           = useState<any[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [calEvents, setCalEvents]   = useState<any[]>([]);
+  const [quotes, setQuotes]         = useState<any[]>([]);
   const [activeTab, setActiveTab]   = useState("activities");
 
   const [activityType, setActivityType]     = useState("note");
@@ -100,6 +104,11 @@ export default function LeadDetail() {
     const { data } = await supabase.from("calendar_events").select("*").eq("lead_id", id).order("scheduled_at");
     setCalEvents(data ?? []);
   };
+  const loadQuotes = async () => {
+    if (!id) return;
+    const { data } = await supabase.from("quotes").select("*").eq("lead_id", id).order("created_at", { ascending: false });
+    setQuotes(data ?? []);
+  };
   const loadAttachments = async () => {
     if (!id) return;
     const { data } = await supabase.from("lead_attachments").select("*").eq("lead_id", id).order("created_at", { ascending: false });
@@ -120,18 +129,20 @@ export default function LeadDetail() {
     const { data: l } = await supabase.from("leads").select("*").eq("id", id).maybeSingle();
     if (cancelled.current) return;
     if (!l) { setLoading(false); return; }
-    const [{ data: s }, { data: p }, { data: a }, { data: t }, { data: att }, { data: cal }] = await Promise.all([
+    const [{ data: s }, { data: p }, { data: a }, { data: t }, { data: att }, { data: cal }, { data: q }] = await Promise.all([
       supabase.from("pipeline_stages").select("*").eq("company_id", l.company_id).order("order"),
       supabase.from("profiles").select("id, full_name, email").eq("company_id", l.company_id),
       supabase.from("lead_activities").select("*").eq("lead_id", id).order("created_at", { ascending: false }),
       supabase.from("tasks").select("*").eq("lead_id", id).order("due_date"),
       supabase.from("lead_attachments").select("*").eq("lead_id", id).order("created_at", { ascending: false }),
       supabase.from("calendar_events").select("*").eq("lead_id", id).order("scheduled_at"),
+      supabase.from("quotes").select("*").eq("lead_id", id).order("created_at", { ascending: false }),
     ]);
     if (cancelled.current) return;
     setLead(l); setStages(s ?? []); setMembers(p ?? []);
     setActs(a ?? []); setTasks(t ?? []); setAttachments(att ?? []);
     setCalEvents(cal ?? []);
+    setQuotes(q ?? []);
     setLoading(false);
   };
 
@@ -196,9 +207,10 @@ export default function LeadDetail() {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !lead) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile || !lead) return;
     setUploading(true);
+    const file = await compressForUpload(rawFile);
     const path = `leads/${lead.id}/${Date.now()}_${file.name}`;
     const { error: upErr } = await supabase.storage.from("lead-attachments").upload(path, file);
     if (upErr) { toast.error(upErr.message); setUploading(false); return; }
@@ -271,6 +283,7 @@ export default function LeadDetail() {
   const tabCounts: Record<string, number> = {
     activities: acts.length, tasks: tasks.length,
     calendar: calEvents.length, files: attachments.length,
+    quotes: quotes.length,
   };
 
   return (
@@ -367,6 +380,19 @@ export default function LeadDetail() {
 
           {/* Operator + Status — aligned right, same row */}
           <div className="flex items-start gap-3 shrink-0">
+
+            {/* Krijo Preventiv */}
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground opacity-0 select-none">·</p>
+              <Button
+                size="sm"
+                onClick={() => nav(`/leads/${lead.id}/preventiv`)}
+                className="h-9 gap-1.5 bg-[hsl(38,62%,52%)] hover:bg-[hsl(38,62%,45%)] text-white"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Krijo Preventiv
+              </Button>
+            </div>
 
             {/* Operator */}
             <div className="flex flex-col gap-1">
@@ -723,6 +749,45 @@ export default function LeadDetail() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: Preventiva ── */}
+          {activeTab === "quotes" && (
+            <div className="space-y-3">
+              <Button
+                size="sm"
+                className="w-full bg-[hsl(38,62%,52%)] hover:bg-[hsl(38,62%,45%)] text-white"
+                onClick={() => nav(`/leads/${lead.id}/preventiv`)}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />Krijo Preventiv të ri
+              </Button>
+              <div className="bg-card rounded-xl border border-border">
+                {quotes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-12">Asnjë preventiv i ruajtur ende.</p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {quotes.map((q) => (
+                      <button
+                        key={q.id}
+                        onClick={() => nav(`/leads/${lead.id}/preventiv/${q.id}`)}
+                        className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/40 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-[hsl(38,62%,52%)]/15 flex items-center justify-center shrink-0">
+                          <FileText className="w-3.5 h-3.5 text-[hsl(38,62%,52%)]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{q.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(q.created_at).toLocaleDateString("sq-AL")} · {Array.isArray(q.items) ? q.items.length : 0} shërbime
+                          </p>
+                        </div>
+                        <span className="text-sm font-bold text-foreground shrink-0">€{Number(q.total).toLocaleString()}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>

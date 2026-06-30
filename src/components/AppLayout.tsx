@@ -4,7 +4,7 @@ import { useAuth, AppRole } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import {
   LayoutDashboard, Users, BarChart3, Settings, LogOut,
-  Building2, ListChecks, Sparkles, CalendarDays,
+  Building2, ListChecks, Sparkles, CalendarDays, FileText,
   ChevronLeft, ChevronRight, Sun, Moon, UserCircle2
 } from "lucide-react";
 import { MediqueLogo } from "@/components/MediqueLogo";
@@ -23,6 +23,7 @@ const NAV: NavItem[] = [
   { to: "/team",            label: "Të gjithë anëtarët",  icon: Users,          roles: ["super_admin"] },
   { to: "/dashboard",       label: "Paneli",              icon: LayoutDashboard,roles: ["company_admin","team_leader","operator"] },
   { to: "/leads",           label: "Pacientët",           icon: ListChecks,     roles: ["company_admin","team_leader","operator"] },
+  { to: "/preventiv",       label: "Preventiv",           icon: FileText,       roles: ["company_admin","team_leader","operator"] },
   { to: "/team",            label: "Ekipi",               icon: Users,          roles: ["company_admin","team_leader"] },
   { to: "/analytics",       label: "Analitika",           icon: BarChart3,      roles: ["company_admin","team_leader"] },
   { to: "/calendar",        label: "Kalendar",            icon: CalendarDays,   roles: ["super_admin","company_admin","team_leader","operator"] },

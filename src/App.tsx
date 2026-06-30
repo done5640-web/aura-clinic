@@ -15,6 +15,8 @@ import NotFound from "./pages/NotFound";
 const Dashboard     = lazy(() => import("./pages/Dashboard"));
 const Leads         = lazy(() => import("./pages/Leads"));
 const LeadDetail    = lazy(() => import("./pages/LeadDetail"));
+const PreventivPicker = lazy(() => import("./pages/PreventivPicker"));
+const PreventivEditor = lazy(() => import("./pages/PreventivEditor"));
 const Team          = lazy(() => import("./pages/Team"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
 const Settings      = lazy(() => import("./pages/Settings"));
@@ -45,6 +47,9 @@ const App = () => (
               <Route path="/dashboard" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><Dashboard /></Suspense></ErrorBoundary>} />
               <Route path="/leads" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><Leads /></Suspense></ErrorBoundary>} />
               <Route path="/leads/:id" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><LeadDetail /></Suspense></ErrorBoundary>} />
+              <Route path="/preventiv" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><PreventivPicker /></Suspense></ErrorBoundary>} />
+              <Route path="/leads/:id/preventiv" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><PreventivEditor /></Suspense></ErrorBoundary>} />
+              <Route path="/leads/:id/preventiv/:quoteId" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><PreventivEditor /></Suspense></ErrorBoundary>} />
               <Route path="/team" element={<RequireAuth allow={["super_admin","company_admin","team_leader"]}><Suspense fallback={<PageLoader />}><Team /></Suspense></RequireAuth>} />
               <Route path="/analytics" element={<RequireAuth allow={["super_admin","company_admin","team_leader"]}><Suspense fallback={<PageLoader />}><Analytics /></Suspense></RequireAuth>} />
               <Route path="/calendar" element={<Suspense fallback={<PageLoader />}><CalendarPage /></Suspense>} />

@@ -12,32 +12,120 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      calendar_events: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          lead_id: string | null
+          notes: string | null
+          scheduled_at: string
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          scheduled_at: string
+          title: string
+          type?: string
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          scheduled_at?: string
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
+          address: string | null
           created_at: string
+          email: string | null
           id: string
           logo_url: string | null
           name: string
+          phone: string | null
           plan: string
           status: Database["public"]["Enums"]["company_status"]
+          website: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           logo_url?: string | null
           name: string
+          phone?: string | null
           plan?: string
           status?: Database["public"]["Enums"]["company_status"]
+          website?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           logo_url?: string | null
           name?: string
+          phone?: string | null
           plan?: string
           status?: Database["public"]["Enums"]["company_status"]
+          website?: string | null
         }
         Relationships: []
       }
@@ -72,6 +160,7 @@ export type Database = {
       }
       lead_activities: {
         Row: {
+          company_id: string | null
           content: string | null
           created_at: string
           id: string
@@ -80,6 +169,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          company_id?: string | null
           content?: string | null
           created_at?: string
           id?: string
@@ -88,6 +178,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          company_id?: string | null
           content?: string | null
           created_at?: string
           id?: string
@@ -97,7 +188,55 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "lead_activities_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          lead_id: string
+          mime_type: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          lead_id: string
+          mime_type?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          lead_id?: string
+          mime_type?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_attachments_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
@@ -114,11 +253,14 @@ export type Database = {
           email: string | null
           first_name: string
           id: string
+          kur_kontaktohet: string | null
           last_name: string | null
           notes: string | null
           phone: string | null
           pipeline_stage_id: string | null
+          sherbimi: string | null
           source: string | null
+          status_changed_at: string | null
           updated_at: string
           value: number
         }
@@ -130,11 +272,14 @@ export type Database = {
           email?: string | null
           first_name: string
           id?: string
+          kur_kontaktohet?: string | null
           last_name?: string | null
           notes?: string | null
           phone?: string | null
           pipeline_stage_id?: string | null
+          sherbimi?: string | null
           source?: string | null
+          status_changed_at?: string | null
           updated_at?: string
           value?: number
         }
@@ -146,11 +291,14 @@ export type Database = {
           email?: string | null
           first_name?: string
           id?: string
+          kur_kontaktohet?: string | null
           last_name?: string | null
           notes?: string | null
           phone?: string | null
           pipeline_stage_id?: string | null
+          sherbimi?: string | null
           source?: string | null
+          status_changed_at?: string | null
           updated_at?: string
           value?: number
         }
@@ -214,6 +362,7 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          team_leader_id: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -222,6 +371,7 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          team_leader_id?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -230,6 +380,7 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          team_leader_id?: string | null
         }
         Relationships: [
           {
@@ -241,9 +392,67 @@ export type Database = {
           },
         ]
       }
+      quotes: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          items: Json
+          lead_id: string
+          notes: string | null
+          title: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          items?: Json
+          lead_id: string
+          notes?: string | null
+          title?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          items?: Json
+          lead_id?: string
+          notes?: string | null
+          title?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string | null
+          company_id: string | null
           completed: boolean
           created_at: string
           due_date: string | null
@@ -253,6 +462,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          company_id?: string | null
           completed?: boolean
           created_at?: string
           due_date?: string | null
@@ -262,6 +472,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          company_id?: string | null
           completed?: boolean
           created_at?: string
           due_date?: string | null
@@ -270,6 +481,13 @@ export type Database = {
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_lead_id_fkey"
             columns: ["lead_id"]
@@ -320,6 +538,8 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      get_my_company: { Args: never; Returns: string }
+      get_my_role: { Args: never; Returns: string }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -473,6 +693,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       activity_type: [
