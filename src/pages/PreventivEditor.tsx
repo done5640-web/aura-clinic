@@ -112,6 +112,17 @@ export default function PreventivEditor() {
     setRows((prev) => [...prev, emptyRow(section ?? prev[prev.length - 1]?.section ?? "Preventiv")]);
   };
 
+  /** Insert a new empty row directly after the given row, in the same section. */
+  const insertRowAfter = (key: string) => {
+    setRows((prev) => {
+      const idx = prev.findIndex((r) => r._key === key);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next.splice(idx + 1, 0, emptyRow(prev[idx].section));
+      return next;
+    });
+  };
+
   const removeRow = (key: string) => setRows((prev) => prev.filter((r) => r._key !== key));
 
   const buildPdfData = (language: PreventivLang) => ({
@@ -259,13 +270,13 @@ export default function PreventivEditor() {
 
         {/* Items table */}
         <div className="space-y-2">
-          <div className="hidden md:grid grid-cols-[1fr_90px_110px_110px_32px] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="hidden md:grid grid-cols-[1fr_90px_110px_110px_60px] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             <span>Shërbimi</span><span>Sasia</span><span>Çmimi</span><span>Totali</span><span />
           </div>
           {rows.map((r, idx) => {
             const showSectionHeader = idx === 0 || rows[idx - 1].section !== r.section;
             return (
-              <div key={r._key}>
+              <div key={r._key} className="group/row">
                 {showSectionHeader && (
                   <div className="flex items-center gap-2 mt-3 mb-1.5">
                     <GripVertical className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -278,7 +289,7 @@ export default function PreventivEditor() {
                     />
                   </div>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_90px_110px_110px_32px] gap-2 items-center bg-muted/30 rounded-lg p-2 md:p-1.5">
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_90px_110px_110px_60px] gap-2 items-center bg-muted/30 rounded-lg p-2 md:p-1.5">
                   <Input
                     placeholder="Shërbimi (p.sh. Implant dentar)"
                     value={r.service}
@@ -303,12 +314,22 @@ export default function PreventivEditor() {
                     onChange={(e) => updateRow(r._key, { total: e.target.value })}
                     className="h-8 text-sm font-semibold"
                   />
-                  <button
-                    onClick={() => removeRow(r._key)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors justify-self-end md:justify-self-center"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 justify-self-end md:justify-self-center">
+                    <button
+                      onClick={() => insertRowAfter(r._key)}
+                      title="Shto rresht poshtë këtij"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => removeRow(r._key)}
+                      title="Fshi këtë rresht"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
