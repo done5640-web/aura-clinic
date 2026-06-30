@@ -7,13 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
-  ArrowLeft, Plus, Trash2, Download, Save, FileText, GripVertical, Sparkles,
+  ArrowLeft, Plus, Trash2, Download, Save, FileText, GripVertical, Sparkles, Languages,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { generatePreventivPdf, QuoteItem } from "@/lib/generatePreventivPdf";
+import { PreventivLang } from "@/lib/preventivTranslations";
+
+const LANGUAGE_OPTIONS: { value: PreventivLang; label: string; flag: string }[] = [
+  { value: "en", label: "English", flag: "🇬🇧" },
+  { value: "it", label: "Italiano", flag: "🇮🇹" },
+  { value: "fr", label: "Français", flag: "🇫🇷" },
+];
 
 interface Row extends QuoteItem {
   _key: string;
@@ -53,6 +61,7 @@ export default function PreventivEditor() {
   const [generating, setGenerating] = useState(false);
   const [pastQuotes, setPastQuotes] = useState<any[]>([]);
   const [deleteQuoteId, setDeleteQuoteId] = useState<string | null>(null);
+  const [langDialogOpen, setLangDialogOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,7 +114,7 @@ export default function PreventivEditor() {
 
   const removeRow = (key: string) => setRows((prev) => prev.filter((r) => r._key !== key));
 
-  const buildPdfData = () => ({
+  const buildPdfData = (language: PreventivLang) => ({
     clinicName: company?.name ?? "Klinika",
     clinicPhone: company?.phone,
     clinicEmail: company?.email,
@@ -115,18 +124,24 @@ export default function PreventivEditor() {
     date: new Date().toLocaleDateString("sq-AL", { day: "2-digit", month: "2-digit", year: "numeric" }),
     items: rows.filter((r) => r.service.trim()).map(({ _key, ...rest }) => rest),
     notes,
+    language,
   });
 
-  const downloadPdf = async () => {
+  const openLanguagePicker = () => {
     if (rows.every((r) => !r.service.trim())) { toast.error("Shto të paktën një shërbim"); return; }
+    setLangDialogOpen(true);
+  };
+
+  const downloadPdf = async (language: PreventivLang) => {
+    setLangDialogOpen(false);
     setGenerating(true);
     try {
-      const bytes = await generatePreventivPdf(buildPdfData());
+      const bytes = await generatePreventivPdf(buildPdfData(language));
       const blob = new Blob([bytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Preventiv_${(lead?.first_name ?? "pacient")}_${(lead?.last_name ?? "")}.pdf`.replace(/\s+/g, "_");
+      a.download = `Preventiv_${(lead?.first_name ?? "pacient")}_${(lead?.last_name ?? "")}_${language}.pdf`.replace(/\s+/g, "_");
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
@@ -326,7 +341,7 @@ export default function PreventivEditor() {
             <Button variant="outline" onClick={saveQuote} disabled={saving}>
               <Save className="w-4 h-4 mr-2" />{saving ? "Duke ruajtur..." : "Ruaj"}
             </Button>
-            <Button onClick={downloadPdf} disabled={generating} className="bg-[hsl(25,12%,26%)] hover:bg-[hsl(25,12%,18%)] text-white">
+            <Button onClick={openLanguagePicker} disabled={generating} className="bg-[hsl(25,12%,26%)] hover:bg-[hsl(25,12%,18%)] text-white">
               <Download className="w-4 h-4 mr-2" />{generating ? "Duke krijuar..." : "Shkarko PDF"}
             </Button>
           </div>
@@ -350,6 +365,31 @@ export default function PreventivEditor() {
         onConfirm={deleteQuote}
         onCancel={() => setDeleteQuoteId(null)}
       />
+
+      {/* Dialog: pick PDF language */}
+      <Dialog open={langDialogOpen} onOpenChange={setLangDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Languages className="w-4 h-4" />
+              Zgjidh gjuhën e PDF-së
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2 pt-1">
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => downloadPdf(opt.value)}
+                disabled={generating}
+                className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors text-left disabled:opacity-50"
+              >
+                <span className="text-xl">{opt.flag}</span>
+                <span className="font-semibold text-sm">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

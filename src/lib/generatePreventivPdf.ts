@@ -1,4 +1,5 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb, RGB } from "pdf-lib";
+import { PreventivLang, PREVENTIV_STRINGS } from "./preventivTranslations";
 
 export interface QuoteItem {
   section: string;
@@ -19,6 +20,7 @@ export interface PreventivData {
   items: QuoteItem[];
   currency?: string;
   notes?: string | null;
+  language?: PreventivLang;
 }
 
 const PAGE_W = 595.28; // A4
@@ -88,6 +90,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   await w.init();
   const currency = data.currency ?? "EUR";
   const contentW = PAGE_W - MARGIN * 2;
+  const t = PREVENTIV_STRINGS[data.language ?? "en"];
 
   // ── Header band ──
   w.rect(0, PAGE_H - 110, PAGE_W, 110, INK);
@@ -99,13 +102,13 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
     w.text(subParts.join("   ·   "), MARGIN, 8.5, { color: rgb(0.85, 0.85, 0.85) });
   }
   w.y = PAGE_H - 46;
-  w.textRight("QUOTE", PAGE_W - MARGIN, 18, { font: w.bold, color: GOLD });
+  w.textRight(t.quote, PAGE_W - MARGIN, 18, { font: w.bold, color: GOLD });
 
   w.y = PAGE_H - 140;
 
   // ── Patient / Date block ──
-  w.text("PATIENT", MARGIN, 8, { font: w.bold, color: MUTED });
-  w.text("DATE", PAGE_W / 2, 8, { font: w.bold, color: MUTED });
+  w.text(t.patient, MARGIN, 8, { font: w.bold, color: MUTED });
+  w.text(t.date, PAGE_W / 2, 8, { font: w.bold, color: MUTED });
   w.y -= 16;
   w.text(data.patientName, MARGIN, 13, { font: w.bold });
   w.text(data.date, PAGE_W / 2, 13, { font: w.bold });
@@ -123,10 +126,10 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
   const drawTableHeader = () => {
     w.rect(MARGIN, w.y - 6, contentW, 22, INK);
-    w.text("SERVICE", colService + 8, 8.5, { font: w.bold, color: WHITE });
-    w.textRight("QTY", colQtyRight, 8.5, { font: w.bold, color: WHITE });
-    w.textRight("PRICE", colUnitRight, 8.5, { font: w.bold, color: WHITE });
-    w.textRight("TOTAL", colTotalRight, 8.5, { font: w.bold, color: WHITE });
+    w.text(t.service, colService + 8, 8.5, { font: w.bold, color: WHITE });
+    w.textRight(t.qty, colQtyRight, 8.5, { font: w.bold, color: WHITE });
+    w.textRight(t.price, colUnitRight, 8.5, { font: w.bold, color: WHITE });
+    w.textRight(t.total, colTotalRight, 8.5, { font: w.bold, color: WHITE });
     w.y -= 22;
   };
 
@@ -142,7 +145,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   // group items by section, preserving order of first appearance
   const sections: { name: string; items: QuoteItem[] }[] = [];
   for (const it of data.items) {
-    const key = it.section || "Services";
+    const key = it.section || t.defaultSectionName;
     let sec = sections.find((s) => s.name === key);
     if (!sec) { sec = { name: key, items: [] }; sections.push(sec); }
     sec.items.push(it);
@@ -216,13 +219,13 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   const totalBoxX = MARGIN + contentW - totalBoxW;
   w.rect(totalBoxX, totalBoxTop - totalBoxH, totalBoxW, totalBoxH, INK);
   w.y = totalBoxTop - totalBoxH / 2 - 3; // vertically center the label/value in the box
-  w.text("TOTAL", totalBoxX + 14, 6, { font: w.bold, color: WHITE });
+  w.text(t.total, totalBoxX + 14, 6, { font: w.bold, color: WHITE });
   w.textRight(money(grandTotal, currency), colTotalRight - 14, 6, { font: w.bold, color: GOLD });
   w.y = totalBoxTop - totalBoxH - 12;
 
   if (data.notes && data.notes.trim()) {
     w.ensureSpace(40);
-    w.text("NOTES", MARGIN, 8, { font: w.bold, color: MUTED });
+    w.text(t.notes, MARGIN, 8, { font: w.bold, color: MUTED });
     w.y -= 14;
     const noteLines = wrapText(data.notes, w.font, 9, contentW);
     for (const line of noteLines) {
@@ -254,23 +257,9 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
     w.y -= 10;
   };
 
-  footerSection("Warranty", [
-    "All our interventions are guaranteed. The guarantee covers the costs of a new intervention, free, therefore entirely paid by the clinic.",
-    "In case of problems, the patient will only have to cover travel expenses. The guarantee is valid in the event of compliance with all the instructions received from our medical staff.",
-    "The dental products we use are top-quality. We operate in compliance with international dental protocols and strict hygiene regulations (ISO 9001 Standard).",
-    "We can demonstrate the origin of the materials through the implant passport and traceability document.",
-  ]);
-
-  footerSection("Payment", [
-    "You can pay in cash, with POS directly in the clinic (a 3% commission is charged), or by bank transfer.",
-    "In the latter case, it is necessary to inform your own bank of the intention to make a transfer from Albania, so that there are no unpleasant inconveniences, blocking, or various restrictions regarding the issuing of a bank transfer via mobile application from abroad (Albania).",
-    "Checks and American Express are not accepted.",
-  ]);
-
-  footerSection("Services Included in the Package", [
-    "Accommodation   ·   Airport pick-up and drop-off service   ·   Assistance throughout the entire stay",
-    "Final consultation and check-up   ·   Certified CE products (European standards)   ·   Written guarantee with implant passport",
-  ]);
+  footerSection(t.warrantyTitle, t.warrantyLines);
+  footerSection(t.paymentTitle, t.paymentLines);
+  footerSection(t.servicesTitle, t.servicesLines);
 
   // Footer contact bar on last page
   const contactParts = [data.clinicPhone, data.clinicEmail, data.clinicWebsite].filter(Boolean);
