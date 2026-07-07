@@ -220,29 +220,9 @@ export default function PreventivEditor() {
     setLangDialogOpen(true);
   };
 
-  const downloadPdf = async (language: PreventivLang) => {
-    setLangDialogOpen(false);
-    setGenerating(true);
-    try {
-      const bytes = await generatePreventivPdf(buildPdfData(language));
-      const blob = new Blob([bytes], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Preventiv_${(lead?.first_name ?? "pacient")}_${(lead?.last_name ?? "")}_${language}.pdf`.replace(/\s+/g, "_");
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast.error("Gabim gjatë krijimit të PDF: " + (err?.message ?? ""));
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const saveQuote = async () => {
-    if (!companyId || !leadId) return;
-    if (rows.every((r) => !r.service.trim())) { toast.error("Shto të paktën një shërbim"); return; }
-    setSaving(true);
+  /** Persists the quote. Returns the error (if any) without toasting, so callers can decide how to react. */
+  const persistQuote = async (): Promise<{ error: string | null }> => {
+    if (!companyId || !leadId) return { error: "Mungon pacienti ose kompania" };
     const items = rows.filter((r) => r.service.trim()).map(({ _key, ...rest }) => rest);
     const payload = {
       lead_id: leadId, company_id: companyId, created_by: user?.id,
@@ -263,11 +243,41 @@ export default function PreventivEditor() {
         nav(`/leads/${leadId}/preventiv/${data.id}`, { replace: true });
       }
     }
+    if (!error) {
+      const { data: quotes } = await supabase.from("quotes").select("*").eq("lead_id", leadId).order("created_at", { ascending: false });
+      setPastQuotes(quotes ?? []);
+    }
+    return { error: error?.message ?? null };
+  };
+
+  const downloadPdf = async (language: PreventivLang) => {
+    setLangDialogOpen(false);
+    setGenerating(true);
+    try {
+      const { error } = await persistQuote();
+      if (error) { toast.error(error); return; }
+      const bytes = await generatePreventivPdf(buildPdfData(language));
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Preventiv_${(lead?.first_name ?? "pacient")}_${(lead?.last_name ?? "")}_${language}.pdf`.replace(/\s+/g, "_");
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error("Gabim gjatë krijimit të PDF: " + (err?.message ?? ""));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const saveQuote = async () => {
+    if (rows.every((r) => !r.service.trim())) { toast.error("Shto të paktën një shërbim"); return; }
+    setSaving(true);
+    const { error } = await persistQuote();
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error); return; }
     toast.success("Preventivi u ruajt");
-    const { data: quotes } = await supabase.from("quotes").select("*").eq("lead_id", leadId).order("created_at", { ascending: false });
-    setPastQuotes(quotes ?? []);
   };
 
   const loadQuote = (q: any) => {
