@@ -395,6 +395,7 @@ export type Database = {
       quotes: {
         Row: {
           company_id: string
+          contact_line: string
           created_at: string
           created_by: string | null
           currency: string
@@ -402,12 +403,16 @@ export type Database = {
           items: Json
           lead_id: string
           notes: string | null
+          services_checklist: Json | null
           title: string
           total: number
           updated_at: string
+          valid_until: string | null
+          website_line: string
         }
         Insert: {
           company_id: string
+          contact_line?: string
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -415,12 +420,16 @@ export type Database = {
           items?: Json
           lead_id: string
           notes?: string | null
+          services_checklist?: Json | null
           title?: string
           total?: number
           updated_at?: string
+          valid_until?: string | null
+          website_line?: string
         }
         Update: {
           company_id?: string
+          contact_line?: string
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -428,9 +437,12 @@ export type Database = {
           items?: Json
           lead_id?: string
           notes?: string | null
+          services_checklist?: Json | null
           title?: string
           total?: number
           updated_at?: string
+          valid_until?: string | null
+          website_line?: string
         }
         Relationships: [
           {

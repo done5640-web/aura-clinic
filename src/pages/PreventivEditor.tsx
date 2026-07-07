@@ -6,16 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
-  ArrowLeft, Plus, Trash2, Download, Save, FileText, GripVertical, Sparkles, Languages,
+  ArrowLeft, Plus, Trash2, Download, Save, FileText, GripVertical, Sparkles, Languages, Percent,
+  CalendarIcon, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { generatePreventivPdf, QuoteItem } from "@/lib/generatePreventivPdf";
-import { PreventivLang } from "@/lib/preventivTranslations";
+import { ChecklistItem, generatePreventivPdf, QuoteItem } from "@/lib/generatePreventivPdf";
+import { PreventivLang, PREVENTIV_STRINGS } from "@/lib/preventivTranslations";
 
 const LANGUAGE_OPTIONS: { value: PreventivLang; label: string; flag: string }[] = [
   { value: "en", label: "English", flag: "🇬🇧" },
@@ -27,13 +31,27 @@ interface Row extends QuoteItem {
   _key: string;
 }
 
-const SECTION_PRESETS = ["Preventiv", "Harku Sipëror", "Harku Inferior", "Shtesa"];
+const SECTION_PRESETS = ["Upper Jaw", "Lower Jaw", "Preventiv", "Shtesa"];
+
+const DEFAULT_CONTACT_LINE = "Contact: +35569606271";
+const DEFAULT_WEBSITE_LINE = "Website: www.auravitaclinic.al";
 
 let keySeq = 0;
 const newKey = () => `r${Date.now()}_${keySeq++}`;
 
 function emptyRow(section: string): Row {
-  return { _key: newKey(), section, service: "", qty: "1", unit_price: "", total: "" };
+  return {
+    _key: newKey(), section, service: "", qty: "1", unit_price: "", total: "",
+    discountEnabled: false, discountType: "percent", discountValue: "",
+  };
+}
+
+function defaultRows(): Row[] {
+  return [emptyRow("Upper Jaw"), emptyRow("Lower Jaw")];
+}
+
+function defaultServicesChecklist(): ChecklistItem[] {
+  return PREVENTIV_STRINGS.en.servicesLines.map((text) => ({ text, checked: true }));
 }
 
 function calcTotal(qty: string, unitPrice: string): string {
@@ -57,6 +75,10 @@ export default function PreventivEditor() {
   const [title, setTitle] = useState("Preventiv");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
+  const [validUntil, setValidUntil] = useState("");
+  const [contactLine, setContactLine] = useState(DEFAULT_CONTACT_LINE);
+  const [websiteLine, setWebsiteLine] = useState(DEFAULT_WEBSITE_LINE);
+  const [servicesChecklist, setServicesChecklist] = useState<ChecklistItem[]>(defaultServicesChecklist());
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [pastQuotes, setPastQuotes] = useState<any[]>([]);
@@ -84,17 +106,31 @@ export default function PreventivEditor() {
           setTitle(existing.title);
           setNotes(existing.notes ?? "");
           setRows((existing.items as unknown as QuoteItem[]).map((it) => ({ ...it, _key: newKey() })));
+          setValidUntil(existing.valid_until ?? "");
+          setContactLine(existing.contact_line ?? DEFAULT_CONTACT_LINE);
+          setWebsiteLine(existing.website_line ?? DEFAULT_WEBSITE_LINE);
+          setServicesChecklist(
+            (existing.services_checklist as ChecklistItem[] | null) ?? defaultServicesChecklist()
+          );
         }
       } else {
-        setRows([emptyRow("Preventiv")]);
+        setRows(defaultRows());
       }
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [leadId, quoteId]);
 
+  const rowDiscountedTotal = (r: Row) => {
+    const base = Number(String(r.total).replace(/[^0-9.-]/g, "")) || 0;
+    if (!r.discountEnabled || !r.discountValue) return base;
+    const dv = Number(String(r.discountValue).replace(",", ".")) || 0;
+    const discounted = Math.max(0, r.discountType === "fixed" ? base - dv : base - (base * dv) / 100);
+    return Number(discounted.toFixed(2));
+  };
+
   const grandTotal = useMemo(() => {
-    return rows.reduce((sum, r) => sum + (Number(String(r.total).replace(/[^0-9.-]/g, "")) || 0), 0);
+    return rows.reduce((sum, r) => sum + rowDiscountedTotal(r), 0);
   }, [rows]);
 
   const updateRow = (key: string, patch: Partial<Row>) => {
@@ -125,6 +161,39 @@ export default function PreventivEditor() {
 
   const removeRow = (key: string) => setRows((prev) => prev.filter((r) => r._key !== key));
 
+  const updateChecklistItem = (idx: number, patch: Partial<ChecklistItem>) => {
+    setServicesChecklist((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  };
+
+  const addChecklistItem = () => {
+    setServicesChecklist((prev) => [...prev, { text: "", checked: true }]);
+  };
+
+  const removeChecklistItem = (idx: number) => {
+    setServicesChecklist((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const fmtDDMMYYYY = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  };
+
+  const toISODate = (d: Date) => {
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  };
+
+  const validUntilDate = validUntil ? new Date(`${validUntil}T00:00:00`) : undefined;
+
+  const fmtDate = (iso: string) => {
+    if (!iso) return null;
+    const d = new Date(`${iso}T00:00:00`);
+    if (isNaN(d.getTime())) return null;
+    return fmtDDMMYYYY(d);
+  };
+
   const buildPdfData = (language: PreventivLang) => ({
     clinicName: company?.name ?? "Klinika",
     clinicPhone: company?.phone,
@@ -132,10 +201,14 @@ export default function PreventivEditor() {
     clinicWebsite: company?.website,
     clinicAddress: company?.address,
     patientName: `${lead?.first_name ?? ""} ${lead?.last_name ?? ""}`.trim(),
-    date: new Date().toLocaleDateString("sq-AL", { day: "2-digit", month: "2-digit", year: "numeric" }),
+    date: fmtDDMMYYYY(new Date()),
+    validUntil: fmtDate(validUntil),
     items: rows.filter((r) => r.service.trim()).map(({ _key, ...rest }) => rest),
     notes,
     language,
+    contactLine,
+    websiteLine,
+    servicesChecklist,
   });
 
   const openLanguagePicker = () => {
@@ -170,6 +243,10 @@ export default function PreventivEditor() {
     const payload = {
       lead_id: leadId, company_id: companyId, created_by: user?.id,
       title: title.trim() || "Preventiv", items, total: grandTotal, notes: notes || null,
+      valid_until: validUntil || null,
+      contact_line: contactLine || DEFAULT_CONTACT_LINE,
+      website_line: websiteLine || DEFAULT_WEBSITE_LINE,
+      services_checklist: servicesChecklist,
     };
     let error;
     if (quoteId) {
@@ -266,30 +343,65 @@ export default function PreventivEditor() {
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Titulli</Label>
             <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
+          <div>
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Vlefshëm deri më (opsionale)</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "mt-1 w-full justify-start text-left font-normal h-9",
+                    !validUntilDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  {validUntilDate ? fmtDDMMYYYY(validUntilDate) : <span>dd/mm/yyyy</span>}
+                  {validUntilDate && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); setValidUntil(""); }}
+                      className="ml-auto rounded-sm p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={validUntilDate}
+                  onSelect={(d) => setValidUntil(d ? toISODate(d) : "")}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Items table */}
         <div className="space-y-2">
-          <div className="hidden md:grid grid-cols-[1fr_90px_110px_110px_60px] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            <span>Shërbimi</span><span>Sasia</span><span>Çmimi</span><span>Totali</span><span />
+          <div className="hidden md:grid grid-cols-[1fr_70px_100px_140px_100px_60px] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span>Shërbimi</span><span>Sasia</span><span>Çmimi</span><span>Zbritje</span><span>Totali</span><span />
           </div>
           {rows.map((r, idx) => {
             const showSectionHeader = idx === 0 || rows[idx - 1].section !== r.section;
             return (
               <div key={r._key} className="group/row">
                 {showSectionHeader && (
-                  <div className="flex items-center gap-2 mt-3 mb-1.5">
+                  <div className="flex items-center gap-2 mt-3 mb-1.5 bg-[hsl(38,62%,52%)]/15 border border-[hsl(38,62%,52%)]/30 rounded-lg px-2 py-1.5">
                     <GripVertical className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     <Input
                       value={r.section}
                       onChange={(e) => updateRow(r._key, { section: e.target.value })}
-                      placeholder="Emri i seksionit (p.sh. Harku Sipëror)"
+                      placeholder="Emri i seksionit (p.sh. Upper Jaw)"
                       list="section-presets"
-                      className="h-7 text-xs font-semibold max-w-xs"
+                      className="h-7 text-xs font-bold max-w-xs bg-transparent border-none focus-visible:ring-1"
                     />
                   </div>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_90px_110px_110px_60px] gap-2 items-center bg-muted/30 rounded-lg p-2 md:p-1.5">
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_70px_100px_140px_100px_60px] gap-2 items-center bg-muted/30 rounded-lg p-2 md:p-1.5">
                   <Input
                     placeholder="Shërbimi (p.sh. Implant dentar)"
                     value={r.service}
@@ -308,11 +420,41 @@ export default function PreventivEditor() {
                     onChange={(e) => updateRow(r._key, { unit_price: e.target.value })}
                     className="h-8 text-sm"
                   />
+                  <div className="flex items-center gap-1">
+                    <Checkbox
+                      checked={!!r.discountEnabled}
+                      onCheckedChange={(checked) => updateRow(r._key, { discountEnabled: !!checked })}
+                      title="Ka zbritje?"
+                    />
+                    {r.discountEnabled && (
+                      <>
+                        <Input
+                          placeholder="0"
+                          value={r.discountValue ?? ""}
+                          onChange={(e) => updateRow(r._key, { discountValue: e.target.value })}
+                          className="h-8 text-sm w-14"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateRow(r._key, { discountType: r.discountType === "fixed" ? "percent" : "fixed" })}
+                          title="Kalo mes % dhe vlerë fikse"
+                          className="h-8 px-1.5 rounded-md border border-border text-xs font-semibold text-muted-foreground hover:bg-muted flex items-center gap-0.5 shrink-0"
+                        >
+                          {r.discountType === "fixed" ? "€" : <Percent className="w-3 h-3" />}
+                        </button>
+                      </>
+                    )}
+                  </div>
                   <Input
                     placeholder="€0"
-                    value={r.total}
+                    value={r.discountEnabled && r.discountValue ? String(rowDiscountedTotal(r)) : r.total}
                     onChange={(e) => updateRow(r._key, { total: e.target.value })}
-                    className="h-8 text-sm font-semibold"
+                    readOnly={!!r.discountEnabled && !!r.discountValue}
+                    title={r.discountEnabled && r.discountValue ? "Totali pas zbritjes (llogaritet automatikisht)" : undefined}
+                    className={cn(
+                      "h-8 text-sm font-semibold",
+                      r.discountEnabled && r.discountValue && "bg-muted/60 cursor-default"
+                    )}
                   />
                   <div className="flex items-center gap-1 justify-self-end md:justify-self-center">
                     <button
@@ -351,6 +493,49 @@ export default function PreventivEditor() {
         <div>
           <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Shënime (opsionale)</Label>
           <Textarea className="mt-1 resize-none" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Shënime shtesë për pacientin..." />
+        </div>
+
+        <div className="space-y-3 pt-2 border-t border-border">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-3">Kontakt (shfaqet në fund të PDF-së)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Kontakti</Label>
+              <Input className="mt-1" value={contactLine} onChange={(e) => setContactLine(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Website</Label>
+              <Input className="mt-1" value={websiteLine} onChange={(e) => setWebsiteLine(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2 pt-2 border-t border-border">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-3">Shërbimet e përfshira (zgjidh çfarë shfaqet në PDF)</p>
+          {servicesChecklist.map((item, idx) => (
+            <div key={idx} className="flex items-start gap-2">
+              <Checkbox
+                className="mt-2.5"
+                checked={item.checked}
+                onCheckedChange={(checked) => updateChecklistItem(idx, { checked: !!checked })}
+              />
+              <Textarea
+                className="resize-none min-h-9 text-sm"
+                rows={1}
+                value={item.text}
+                onChange={(e) => updateChecklistItem(idx, { text: e.target.value })}
+              />
+              <button
+                onClick={() => removeChecklistItem(idx)}
+                title="Fshi këtë rresht"
+                className="w-8 h-8 mt-0.5 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={addChecklistItem}>
+            <Plus className="w-3.5 h-3.5 mr-1.5" />Shto shërbim
+          </Button>
         </div>
 
         <div className="flex items-center justify-between pt-3 border-t border-border">
