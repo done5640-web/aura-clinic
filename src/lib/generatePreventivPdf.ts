@@ -205,11 +205,13 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, GOLD, 1.4);
   w.y -= 24;
 
+  const hasDiscounts = data.items.some((it) => it.discountEnabled && it.discountValue);
+
   // ── Table columns ── numeric columns are right edges so values never overflow
   const TABLE_RIGHT_PAD = 10;
   const colService = MARGIN;
-  const colQtyRight = MARGIN + contentW - 260;
-  const colUnitRight = MARGIN + contentW - 165;
+  const colQtyRight = MARGIN + contentW - (hasDiscounts ? 260 : 190);
+  const colUnitRight = MARGIN + contentW - (hasDiscounts ? 165 : 95);
   const colDiscountRight = MARGIN + contentW - 95;
   const colTotalRight = MARGIN + contentW - TABLE_RIGHT_PAD;
   const colServiceMaxX = colQtyRight - 50; // leave room for the qty column
@@ -219,7 +221,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
     w.text(t.service, colService + 8, 8.5, { font: w.bold, color: WHITE });
     w.textRight(t.qty, colQtyRight, 8.5, { font: w.bold, color: WHITE });
     w.textRight(t.price, colUnitRight, 8.5, { font: w.bold, color: WHITE });
-    w.textRight(t.discount, colDiscountRight, 8.5, { font: w.bold, color: WHITE });
+    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, 8.5, { font: w.bold, color: WHITE });
     w.textRight(t.total, colTotalRight, 8.5, { font: w.bold, color: WHITE });
     w.y -= 22;
   };
