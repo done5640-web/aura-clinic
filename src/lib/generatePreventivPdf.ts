@@ -31,6 +31,7 @@ export interface PreventivData {
   notes?: string | null;
   language?: PreventivLang;
   contactLine?: string | null;
+  emailLine?: string | null;
   websiteLine?: string | null;
   servicesChecklist?: ChecklistItem[];
 }
@@ -66,6 +67,54 @@ function money(v: string | number, currency: string) {
   if (!isFinite(n)) return String(v);
   const symbol = currency === "EUR" ? "€" : currency;
   return `${symbol}${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+interface Token { text: string; bold: boolean }
+
+/** Splits "some **bold** text" into alternating plain/bold tokens (words, spaces preserved as separators). */
+function tokenize(line: string): Token[] {
+  const tokens: Token[] = [];
+  const parts = line.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+  for (const part of parts) {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      tokens.push({ text: part.slice(2, -2), bold: true });
+    } else {
+      tokens.push({ text: part, bold: false });
+    }
+  }
+  return tokens;
+}
+
+/** Wraps a token stream into visual lines of {text, bold} words, each fitting within maxW. */
+function wrapTokens(tokens: Token[], font: PDFFont, bold: PDFFont, size: number, maxW: number): Token[][] {
+  const words: Token[] = [];
+  for (const tok of tokens) {
+    const parts = tok.text.split(/(\s+)/).filter((s) => s.length);
+    for (const p of parts) words.push({ text: p, bold: tok.bold });
+  }
+  const lines: Token[][] = [];
+  let cur: Token[] = [];
+  let curW = 0;
+  for (const word of words) {
+    if (/^\s+$/.test(word.text) && cur.length === 0) continue; // skip leading spaces on a new line
+    const f = word.bold ? bold : font;
+    const w = f.widthOfTextAtSize(word.text, size);
+    if (curW + w > maxW && cur.length) {
+      // trim trailing space token before breaking
+      while (cur.length && /^\s+$/.test(cur[cur.length - 1].text)) cur.pop();
+      lines.push(cur);
+      cur = [];
+      curW = 0;
+      if (/^\s+$/.test(word.text)) continue;
+    }
+    cur.push(word);
+    curW += w;
+  }
+  if (cur.length) {
+    while (cur.length && /^\s+$/.test(cur[cur.length - 1].text)) cur.pop();
+    lines.push(cur);
+  }
+  return lines.length ? lines : [[]];
 }
 
 class Writer {
@@ -108,6 +157,16 @@ class Writer {
 
   lineH(x1: number, x2: number, y: number, color = LINE, thickness = 0.75) {
     this.page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, thickness, color });
+  }
+
+  /** Draws a single already-wrapped line of mixed plain/bold tokens starting at x. */
+  drawTokenLine(tokens: Token[], x: number, size: number, color: RGB) {
+    let cx = x;
+    for (const tok of tokens) {
+      const f = tok.bold ? this.bold : this.font;
+      this.page.drawText(tok.text, { x: cx, y: this.y, size, font: f, color });
+      cx += f.widthOfTextAtSize(tok.text, size);
+    }
   }
 }
 
@@ -277,23 +336,41 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, LINE);
   w.y -= 20;
 
+  const BULLET_INDENT = 12;
+  const SIZE = 8.5;
+  const LEADING = 11.5;
+
+  /** Renders **bold**-marked, optionally "- "-bulleted paragraph lines under a gold title. */
   const footerSection = (title: string, lines: string[]) => {
-    w.ensureSpace(16 + lines.length * 12);
+    w.ensureSpace(16 + lines.length * LEADING);
     w.text(title.toUpperCase(), MARGIN, 9, { font: w.bold, color: GOLD });
-    w.y -= 14;
-    for (const line of lines) {
-      const wrapped = wrapText(line, w.font, 8.5, contentW);
-      for (const wl of wrapped) {
+    w.y -= 15;
+    for (const raw of lines) {
+      const isBullet = raw.startsWith("- ");
+      const line = isBullet ? raw.slice(2) : raw;
+      const x = isBullet ? MARGIN + BULLET_INDENT : MARGIN;
+      const maxW = contentW - (isBullet ? BULLET_INDENT : 0);
+      const wrapped = wrapTokens(tokenize(line), w.font, w.bold, SIZE, maxW);
+      wrapped.forEach((tl, i) => {
         w.ensureSpace(12);
-        w.text(wl, MARGIN, 8.5, { color: MUTED });
-        w.y -= 11.5;
-      }
+        if (isBullet && i === 0) w.text("•", MARGIN, SIZE, { color: MUTED });
+        w.drawTokenLine(tl, x, SIZE, MUTED);
+        w.y -= LEADING;
+      });
+      w.y -= 3; // paragraph gap
     }
-    w.y -= 10;
+    w.y -= 7;
   };
 
-  // Contact / website line, right before the closing warranty/payment text
-  const infoLines = [data.contactLine, data.websiteLine].filter((l): l is string => !!l && l.trim().length > 0);
+  const serviceLines = data.servicesChecklist
+    ? data.servicesChecklist.filter((it) => it.checked).map((it) => it.text)
+    : t.servicesLines;
+  footerSection(t.servicesTitle, serviceLines);
+  footerSection(t.paymentTitle, t.paymentLines);
+  footerSection(t.warrantyTitle, t.warrantyLines);
+
+  // Contact / email / website line, at the very end
+  const infoLines = [data.contactLine, data.emailLine, data.websiteLine].filter((l): l is string => !!l && l.trim().length > 0);
   if (infoLines.length) {
     w.ensureSpace(10 + infoLines.length * 12);
     for (const line of infoLines) {
@@ -302,14 +379,6 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
     }
     w.y -= 6;
   }
-
-  footerSection(t.warrantyTitle, t.warrantyLines);
-  footerSection(t.paymentTitle, t.paymentLines);
-
-  const serviceLines = data.servicesChecklist
-    ? data.servicesChecklist.filter((it) => it.checked).map((it) => it.text)
-    : t.servicesLines;
-  footerSection(t.servicesTitle, serviceLines);
 
   return w.doc.save();
 }

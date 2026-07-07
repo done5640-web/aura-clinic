@@ -399,6 +399,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
+          email_line: string
           id: string
           items: Json
           lead_id: string
@@ -416,6 +417,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          email_line?: string
           id?: string
           items?: Json
           lead_id: string
@@ -433,6 +435,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          email_line?: string
           id?: string
           items?: Json
           lead_id?: string

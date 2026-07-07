@@ -33,7 +33,8 @@ interface Row extends QuoteItem {
 
 const SECTION_PRESETS = ["Upper Jaw", "Lower Jaw", "Preventiv", "Shtesa"];
 
-const DEFAULT_CONTACT_LINE = "Contact: +35569606271";
+const DEFAULT_CONTACT_LINE = "Contact: +355696062711";
+const DEFAULT_EMAIL_LINE = "Email: clinicauravita@gmail.com";
 const DEFAULT_WEBSITE_LINE = "Website: www.auravitaclinic.al";
 
 let keySeq = 0;
@@ -77,6 +78,7 @@ export default function PreventivEditor() {
   const [rows, setRows] = useState<Row[]>([]);
   const [validUntil, setValidUntil] = useState("");
   const [contactLine, setContactLine] = useState(DEFAULT_CONTACT_LINE);
+  const [emailLine, setEmailLine] = useState(DEFAULT_EMAIL_LINE);
   const [websiteLine, setWebsiteLine] = useState(DEFAULT_WEBSITE_LINE);
   const [servicesChecklist, setServicesChecklist] = useState<ChecklistItem[]>(defaultServicesChecklist());
   const [saving, setSaving] = useState(false);
@@ -108,6 +110,7 @@ export default function PreventivEditor() {
           setRows((existing.items as unknown as QuoteItem[]).map((it) => ({ ...it, _key: newKey() })));
           setValidUntil(existing.valid_until ?? "");
           setContactLine(existing.contact_line ?? DEFAULT_CONTACT_LINE);
+          setEmailLine(existing.email_line ?? DEFAULT_EMAIL_LINE);
           setWebsiteLine(existing.website_line ?? DEFAULT_WEBSITE_LINE);
           setServicesChecklist(
             (existing.services_checklist as ChecklistItem[] | null) ?? defaultServicesChecklist()
@@ -207,6 +210,7 @@ export default function PreventivEditor() {
     notes,
     language,
     contactLine,
+    emailLine,
     websiteLine,
     servicesChecklist,
   });
@@ -245,6 +249,7 @@ export default function PreventivEditor() {
       title: title.trim() || "Preventiv", items, total: grandTotal, notes: notes || null,
       valid_until: validUntil || null,
       contact_line: contactLine || DEFAULT_CONTACT_LINE,
+      email_line: emailLine || DEFAULT_EMAIL_LINE,
       website_line: websiteLine || DEFAULT_WEBSITE_LINE,
       services_checklist: servicesChecklist,
     };
@@ -497,10 +502,14 @@ export default function PreventivEditor() {
 
         <div className="space-y-3 pt-2 border-t border-border">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-3">Kontakt (shfaqet në fund të PDF-së)</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label className="text-xs text-muted-foreground">Kontakti</Label>
               <Input className="mt-1" value={contactLine} onChange={(e) => setContactLine(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Email</Label>
+              <Input className="mt-1" value={emailLine} onChange={(e) => setEmailLine(e.target.value)} />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Website</Label>
