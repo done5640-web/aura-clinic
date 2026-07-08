@@ -783,8 +783,8 @@ export default function Leads() {
 
                       <TableCell>
                         {s ? (
-                          <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold whitespace-nowrap", stageTextBadge(s.name))}>
-                            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", stageColorClass(s.name))} />
+                          <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold whitespace-nowrap", stageTextBadge(s.name, s.code))}>
+                            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", stageColorClass(s.name, s.code))} />
                             {s.name}
                           </span>
                         ) : <span className="text-muted-foreground text-sm">—</span>}

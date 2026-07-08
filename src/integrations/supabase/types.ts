@@ -321,6 +321,7 @@ export type Database = {
       }
       pipeline_stages: {
         Row: {
+          code: string | null
           color: string
           company_id: string
           created_at: string
@@ -329,6 +330,7 @@ export type Database = {
           order: number
         }
         Insert: {
+          code?: string | null
           color?: string
           company_id: string
           created_at?: string
@@ -337,6 +339,7 @@ export type Database = {
           order?: number
         }
         Update: {
+          code?: string | null
           color?: string
           company_id?: string
           created_at?: string

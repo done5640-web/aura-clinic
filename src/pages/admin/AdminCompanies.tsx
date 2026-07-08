@@ -14,15 +14,15 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const DEFAULT_STAGES = [
-  { name: "Non interesato",     color: "#ef4444" },
-  { name: "Non risponde",       color: "#f97316" },
-  { name: "Preventivo inviato", color: "#8b5cf6" },
-  { name: "Call back",          color: "#3b82f6" },
-  { name: "Attesa photo",       color: "#06b6d4" },
-  { name: "Richiamo piu mesi",  color: "#f59e0b" },
-  { name: "Non idoneo",         color: "#6b7280" },
-  { name: "Numero sbagliato",   color: "#ec4899" },
-  { name: "Messagio whatsApp",  color: "#10b981" },
+  { name: "Not Interested",      color: "#ef4444", code: "not_interested" },
+  { name: "Not Responding",      color: "#f97316", code: "not_responding" },
+  { name: "Quote Sent",          color: "#8b5cf6", code: "quote_sent" },
+  { name: "Call Back",           color: "#3b82f6", code: "call_back" },
+  { name: "Awaiting Photos",     color: "#06b6d4", code: "awaiting_photos" },
+  { name: "Follow Up in Months", color: "#f59e0b", code: "follow_up_months" },
+  { name: "Not Eligible",        color: "#6b7280", code: "not_eligible" },
+  { name: "Wrong Number",        color: "#ec4899", code: "wrong_number" },
+  { name: "WhatsApp Message",    color: "#10b981", code: "whatsapp_message" },
 ];
 
 export default function AdminCompanies() {
@@ -67,7 +67,7 @@ export default function AdminCompanies() {
     if (compErr || !company) { toast.error(compErr?.message ?? "Gabim"); setBusy(false); return; }
 
     await supabase.from("pipeline_stages").insert(
-      DEFAULT_STAGES.map((s, i) => ({ company_id: company.id, name: s.name, order: i + 1, color: s.color }))
+      DEFAULT_STAGES.map((s, i) => ({ company_id: company.id, name: s.name, order: i + 1, color: s.color, code: s.code }))
     );
 
     const { data: createData, error: createErr } = await supabase.functions.invoke("create-user", {

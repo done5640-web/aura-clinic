@@ -31,7 +31,7 @@ export default function Analytics() {
 
   const loadAnalytics = async (cid: string) => {
     const [leads, { data: stages }, { data: profs }] = await Promise.all([
-        fetchAll((f, t) => supabase.from("leads").select("value, source, pipeline_stage_id, assigned_to_user_id, pipeline_stages(name, order)").eq("company_id", cid).range(f, t)),
+        fetchAll((f, t) => supabase.from("leads").select("value, source, pipeline_stage_id, assigned_to_user_id, pipeline_stages(name, order, code)").eq("company_id", cid).range(f, t)),
         supabase.from("pipeline_stages").select("*").eq("company_id", cid).order("order"),
         supabase.from("profiles").select("id, full_name, email").eq("company_id", cid),
       ]);
@@ -48,7 +48,8 @@ export default function Analytics() {
           const u = userMap.get(l.assigned_to_user_id) ?? { leads: 0, value: 0, won: 0 };
           u.leads += 1; u.value += Number(l.value || 0);
           const n = (l.pipeline_stages?.name ?? "").toLowerCase();
-          if (n.includes("fituar") || n.includes("won")) u.won += 1;
+          const stageCode = l.pipeline_stages?.code;
+          if (stageCode === "won" || n.includes("fituar") || n.includes("won")) u.won += 1;
           userMap.set(l.assigned_to_user_id, u);
         }
       });

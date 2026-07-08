@@ -425,7 +425,7 @@ export default function LeadDetail() {
                 <Select value={lead.pipeline_stage_id ?? ""} onValueChange={changeStage}>
                   <SelectTrigger className="h-9 w-[200px] font-semibold text-sm border border-border">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {currentStage && <span className={cn("w-2 h-2 rounded-full shrink-0", stageColorClass(currentStage.name))} />}
+                      {currentStage && <span className={cn("w-2 h-2 rounded-full shrink-0", stageColorClass(currentStage.name, currentStage.code))} />}
                       <span className="truncate">{currentStage?.name ?? "Zgjidh"}</span>
                     </div>
                   </SelectTrigger>
@@ -433,7 +433,7 @@ export default function LeadDetail() {
                     {stages.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         <div className="flex items-center gap-2">
-                          <span className={cn("w-2 h-2 rounded-full shrink-0", stageColorClass(s.name))} />
+                          <span className={cn("w-2 h-2 rounded-full shrink-0", stageColorClass(s.name, s.code))} />
                           {s.name}
                         </div>
                       </SelectItem>
@@ -442,7 +442,7 @@ export default function LeadDetail() {
                 </Select>
               ) : (
                 <div className="flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-muted/40">
-                  {currentStage && <span className={cn("w-2 h-2 rounded-full shrink-0", stageColorClass(currentStage.name))} />}
+                  {currentStage && <span className={cn("w-2 h-2 rounded-full shrink-0", stageColorClass(currentStage.name, currentStage.code))} />}
                   <span className="text-sm font-semibold">{currentStage?.name ?? "Pa status"}</span>
                 </div>
               )}
