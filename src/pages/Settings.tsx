@@ -97,7 +97,9 @@ function PipelineEditor({ companyId }: { companyId: string }) {
   const add = async () => {
     if (!newName.trim()) return;
     const order = (stages[stages.length - 1]?.order ?? 0) + 1;
-    const { error } = await supabase.from("pipeline_stages").insert({ company_id: companyId, name: newName.trim(), order, color: "#6366f1" });
+    const name = newName.trim();
+    const code = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+    const { error } = await supabase.from("pipeline_stages").insert({ company_id: companyId, name, order, color: "#6366f1", code });
     if (error) toast.error(error.message); else { toast.success("Statusi u shtua"); setNewName(""); load(); }
   };
   const update = async (id: string, patch: any) => {
