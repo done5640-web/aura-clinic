@@ -224,13 +224,20 @@ export default function Team() {
     // Clear team_leader_id when promoting away from operator
     updates.team_leader_id = editForm.role === "operator" ? (editForm.team_leader_id || null) : null;
 
-    const { error } = await supabase
+    const { data: updatedRows, error } = await supabase
       .from("profiles")
       .update(updates)
-      .eq("id", editMember.id);
+      .eq("id", editMember.id)
+      .select("id");
 
     if (error) {
       toast.error("Gabim në ruajtje: " + error.message);
+      setEditBusy(false);
+      return;
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      toast.error("Nuk keni leje për të ndryshuar këtë anëtar");
       setEditBusy(false);
       return;
     }
