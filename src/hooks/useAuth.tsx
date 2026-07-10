@@ -77,6 +77,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Instant force-logout: subscribe to our own profile row and sign out
+  // the moment force_logout_at changes (e.g. an admin reset our password).
+  useEffect(() => {
+    if (!user) return;
+    const sessionStartedAt = Date.now();
+    const channel = supabase
+      .channel(`profile-force-logout-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
+        (payload) => {
+          const forcedAt = payload.new?.force_logout_at;
+          if (forcedAt && new Date(forcedAt).getTime() > sessionStartedAt) {
+            supabase.auth.signOut();
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
+
   const refresh = async () => { if (user) await loadProfile(user.id); };
   const signOut = async () => { await supabase.auth.signOut(); };
 

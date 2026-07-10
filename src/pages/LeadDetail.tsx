@@ -77,6 +77,9 @@ export default function LeadDetail() {
 
   const [activityType, setActivityType]     = useState("note");
   const [activityContent, setActivityContent] = useState("");
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const [editingActivityContent, setEditingActivityContent] = useState("");
+  const [deleteActivityId, setDeleteActivityId] = useState<string | null>(null);
   const [taskTitle, setTaskTitle]   = useState("");
   const [taskDue, setTaskDue]       = useState("");
   const [uploading, setUploading]   = useState(false);
@@ -182,6 +185,37 @@ export default function LeadDetail() {
     if (error) { toast.error(error.message); return; }
     setActivityContent("");
     toast.success("Aktiviteti u regjistrua");
+    loadActivities();
+  };
+
+  const startEditActivity = (a: any) => {
+    setEditingActivityId(a.id);
+    setEditingActivityContent(a.content);
+  };
+
+  const cancelEditActivity = () => {
+    setEditingActivityId(null);
+    setEditingActivityContent("");
+  };
+
+  const saveEditActivity = async () => {
+    if (!editingActivityId || !editingActivityContent.trim()) return;
+    const { error } = await supabase
+      .from("lead_activities")
+      .update({ content: editingActivityContent.trim() })
+      .eq("id", editingActivityId);
+    if (error) { toast.error(error.message); return; }
+    cancelEditActivity();
+    toast.success("Aktiviteti u përditësua");
+    loadActivities();
+  };
+
+  const deleteActivity = async () => {
+    if (!deleteActivityId) return;
+    const { error } = await supabase.from("lead_activities").delete().eq("id", deleteActivityId);
+    setDeleteActivityId(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Aktiviteti u fshi");
     loadActivities();
   };
 
@@ -574,6 +608,8 @@ export default function LeadDetail() {
                     {acts.map((a: any) => {
                       const Icon = ACTIVITY_ICONS[a.type] ?? StickyNote;
                       const author = members.find(m => m.id === a.user_id);
+                      const canEditThis = a.type !== "status_change" && (a.user_id === user?.id || canManage);
+                      const isEditing = editingActivityId === a.id;
                       return (
                         <div key={a.id} className="flex gap-3 p-4">
                           <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
@@ -587,9 +623,44 @@ export default function LeadDetail() {
                               <span className="text-xs font-semibold text-foreground">{author?.full_name || author?.email || "Sistemi"}</span>
                               <span className="text-xs text-muted-foreground ml-auto">
                                 {new Date(a.created_at).toLocaleString("sq-AL")}
+                                {a.updated_at && " · redaktuar"}
                               </span>
+                              {canEditThis && !isEditing && (
+                                <div className="flex items-center gap-0.5">
+                                  <button
+                                    onClick={() => startEditActivity(a)}
+                                    title="Redakto"
+                                    className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteActivityId(a.id)}
+                                    title="Fshi"
+                                    className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                            <p className="text-sm text-foreground/80 whitespace-pre-wrap">{a.content}</p>
+                            {isEditing ? (
+                              <div className="space-y-2">
+                                <Textarea
+                                  value={editingActivityContent}
+                                  onChange={(e) => setEditingActivityContent(e.target.value)}
+                                  className="resize-none text-sm"
+                                  rows={3}
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={saveEditActivity}>Ruaj</Button>
+                                  <Button size="sm" variant="outline" onClick={cancelEditActivity}>Anulo</Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-foreground/80 whitespace-pre-wrap">{a.content}</p>
+                            )}
                           </div>
                         </div>
                       );
@@ -802,6 +873,14 @@ export default function LeadDetail() {
         description={`Jeni të sigurt që doni të fshini "${lead.first_name} ${lead.last_name ?? ""}"? Ky veprim nuk mund të kthehet.`}
         onConfirm={deleteLead}
         onCancel={() => setDeleteOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={!!deleteActivityId}
+        title="Fshi aktivitetin"
+        description="Jeni të sigurt që doni të fshini këtë aktivitet? Ky veprim nuk mund të kthehet."
+        onConfirm={deleteActivity}
+        onCancel={() => setDeleteActivityId(null)}
       />
 
       {/* Dialog: Planifiko telefonatë */}

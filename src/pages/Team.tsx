@@ -50,6 +50,8 @@ export default function Team() {
   const [editMember, setEditMember] = useState<Member | null>(null);
   const [editForm, setEditForm] = useState({ team_leader_id: "", company_id: "", role: "" });
   const [editBusy, setEditBusy] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const isSuperAdmin = primaryRole === "super_admin";
   const canManageTeam = isSuperAdmin || primaryRole === "company_admin";
@@ -209,6 +211,32 @@ export default function Team() {
       company_id: m.company_id ?? "",
       role: m.role,
     });
+    setNewPassword("");
+  };
+
+  const resetPassword = async () => {
+    if (!editMember) return;
+    if (newPassword.length < 8) return toast.error("Fjalëkalimi min. 8 karaktere");
+    setResettingPassword(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL ?? "https://yaoaulvxrxgcitbfpapy.supabase.co"}/functions/v1/reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token}`,
+        "apikey": SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify({ user_id: editMember.id, password: newPassword }),
+    });
+    const resData = await res.json();
+    setResettingPassword(false);
+    if (!res.ok || resData?.error) {
+      toast.error(resData?.error ?? "Gabim në ndryshimin e fjalëkalimit");
+      return;
+    }
+    toast.success("Fjalëkalimi u ndryshua");
+    setNewPassword("");
   };
 
   const saveEdit = async () => {
@@ -266,9 +294,24 @@ export default function Team() {
 
   const removeMember = async () => {
     if (!confirmMember) return;
-    await supabase.from("user_roles").delete().eq("user_id", confirmMember.id);
-    await supabase.from("profiles").delete().eq("id", confirmMember.id);
+    const target = confirmMember;
     setConfirmMember(null);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL ?? "https://yaoaulvxrxgcitbfpapy.supabase.co"}/functions/v1/delete-user`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token}`,
+        "apikey": SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify({ user_id: target.id }),
+    });
+    const resData = await res.json();
+    if (!res.ok || resData?.error) {
+      toast.error(resData?.error ?? "Gabim gjatë heqjes së anëtarit");
+      return;
+    }
     toast.success("Anëtari u hoq");
     load();
   };
@@ -364,8 +407,8 @@ export default function Team() {
               </div>
             )}
 
-            {/* Team leader assignment — show for operators */}
-            {editForm.role === "operator" && (
+            {/* Team leader assignment — admin only, show for operators */}
+            {canManageTeam && editForm.role === "operator" && (
               <div>
                 <Label>Team Leader</Label>
                 <Select
@@ -385,15 +428,38 @@ export default function Team() {
             )}
 
 
-            {editForm.role === "operator" && teamLeaders.length === 0 && (
+            {canManageTeam && editForm.role === "operator" && teamLeaders.length === 0 && (
               <p className="text-sm text-muted-foreground">Nuk ka team leaders në këtë kompani.</p>
             )}
 
+            {/* Password reset — admin can reset anyone in company, team leader only their own operators */}
+            {editMember?.role !== "super_admin" && (canManageTeam || (primaryRole === "team_leader" && editMember?.team_leader_id === user?.id)) && (
+              <div className="pt-2 border-t border-border">
+                <Label>Fjalëkalim i ri</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    type="text"
+                    placeholder="Min. 8 karaktere"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  <Button variant="outline" onClick={resetPassword} disabled={resettingPassword || newPassword.length < 8}>
+                    {resettingPassword && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Ndrysho
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Përdoruesi do të dilet automatikisht nga çdo sesion aktiv.</p>
+              </div>
+            )}
+
             <div className="flex gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setEditMember(null)}>Anulo</Button>
-              <Button className="flex-1" onClick={saveEdit} disabled={editBusy}>
-                {editBusy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Ruaj
+              <Button variant="outline" className="flex-1" onClick={() => setEditMember(null)}>
+                {canManageTeam ? "Anulo" : "Mbyll"}
               </Button>
+              {canManageTeam && (
+                <Button className="flex-1" onClick={saveEdit} disabled={editBusy}>
+                  {editBusy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Ruaj
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>
@@ -403,6 +469,8 @@ export default function Team() {
       <MemberList
         members={members}
         canManage={canManageTeam}
+        isTeamLeader={primaryRole === "team_leader"}
+        currentUserId={user?.id ?? null}
         teamLeaders={teamLeaders}
         onRemove={(m) => setConfirmMember(m)}
         onEdit={openEdit}
@@ -422,12 +490,16 @@ export default function Team() {
 function MemberList({
   members,
   canManage,
+  isTeamLeader,
+  currentUserId,
   teamLeaders,
   onRemove,
   onEdit,
 }: {
   members: Member[];
   canManage: boolean;
+  isTeamLeader: boolean;
+  currentUserId: string | null;
   teamLeaders: { id: string; full_name: string | null; email: string }[];
   onRemove: (m: Member) => void;
   onEdit: (m: Member) => void;
@@ -485,6 +557,11 @@ function MemberList({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+            {!canManage && isTeamLeader && m.role === "operator" && m.team_leader_id === currentUserId && (
+              <Button variant="ghost" size="icon" className="shrink-0" onClick={() => onEdit(m)} title="Ndrysho fjalëkalimin">
+                <Pencil className="w-4 h-4" />
+              </Button>
             )}
           </div>
         ))}

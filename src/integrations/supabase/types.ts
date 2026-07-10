@@ -166,6 +166,7 @@ export type Database = {
           id: string
           lead_id: string
           type: Database["public"]["Enums"]["activity_type"]
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -175,6 +176,7 @@ export type Database = {
           id?: string
           lead_id: string
           type: Database["public"]["Enums"]["activity_type"]
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -184,6 +186,7 @@ export type Database = {
           id?: string
           lead_id?: string
           type?: Database["public"]["Enums"]["activity_type"]
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -363,6 +366,7 @@ export type Database = {
           company_id: string | null
           created_at: string
           email: string
+          force_logout_at: string | null
           full_name: string | null
           id: string
           team_leader_id: string | null
@@ -372,6 +376,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           email: string
+          force_logout_at?: string | null
           full_name?: string | null
           id: string
           team_leader_id?: string | null
@@ -381,6 +386,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           email?: string
+          force_logout_at?: string | null
           full_name?: string | null
           id?: string
           team_leader_id?: string | null

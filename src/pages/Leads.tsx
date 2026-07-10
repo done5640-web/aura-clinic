@@ -145,7 +145,11 @@ export default function Leads() {
       const roleMap = new Map<string, string>();
       (roleRows ?? []).forEach((r: any) => roleMap.set(r.user_id, r.role));
       const tls = (p ?? []).filter((prof: any) => roleMap.get(prof.id) === "team_leader");
-      assignTargetsData = tls.map((tl: any) => ({ ...tl, label: "Team Leader" }));
+      const ops = (p ?? []).filter((prof: any) => roleMap.get(prof.id) === "operator");
+      assignTargetsData = [
+        ...tls.map((tl: any) => ({ ...tl, label: "Team Leader" })),
+        ...ops.map((op: any) => ({ ...op, label: "Operator" })),
+      ];
 
     } else if (role === "team_leader" && cid) {
       const { data: myOperators } = await supabase.from("profiles").select("id, full_name, email").eq("team_leader_id", user?.id ?? "");
@@ -492,10 +496,10 @@ export default function Leads() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors">
-                  {primaryRole === "company_admin" ? "Cakto te Team Leader" : primaryRole === "team_leader" ? "Cakto te Operator" : "Cakto"} <ChevronDown className="w-3 h-3" />
+                  {primaryRole === "company_admin" ? "Cakto" : primaryRole === "team_leader" ? "Cakto te Operator" : "Cakto"} <ChevronDown className="w-3 h-3" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-56 max-h-72 overflow-y-auto">
                 {assignTargets.map((t) => (
                   <DropdownMenuItem key={t.id} onClick={() => selected.size > 1 ? setBulkConfirmAssign({ userId: t.id, userName: t.full_name || t.email }) : bulkAssign(t.id)}>
                     <div className="flex flex-col">
