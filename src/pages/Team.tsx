@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, Loader2, Pencil } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Loader2, Pencil, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { fetchAll } from "@/lib/fetchAll";
@@ -45,6 +45,7 @@ export default function Team() {
   const [addForm, setAddForm] = useState({ email: "", password: "", full_name: "", role: "operator", company_id: "", team_leader_id: "" });
   const [teamLeaders, setTeamLeaders] = useState<{ id: string; full_name: string | null; email: string }[]>([]);
   const [confirmMember, setConfirmMember] = useState<Member | null>(null);
+  const [confirmUnassign, setConfirmUnassign] = useState<Member | null>(null);
 
   // Edit member dialog
   const [editMember, setEditMember] = useState<Member | null>(null);
@@ -316,6 +317,26 @@ export default function Team() {
     load();
   };
 
+  const unassignOperator = async () => {
+    if (!confirmUnassign) return;
+    const target = confirmUnassign;
+    setConfirmUnassign(null);
+
+    const { data: updatedRows, error } = await supabase
+      .from("profiles")
+      .update({ team_leader_id: null })
+      .eq("id", target.id)
+      .select("id");
+
+    if (error) { toast.error(error.message); return; }
+    if (!updatedRows || updatedRows.length === 0) {
+      toast.error("Nuk keni leje për këtë veprim");
+      return;
+    }
+    toast.success("Operatori u hoq nga ekipi juaj");
+    load();
+  };
+
   if (loading) return <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>;
 
   return (
@@ -474,6 +495,7 @@ export default function Team() {
         teamLeaders={teamLeaders}
         onRemove={(m) => setConfirmMember(m)}
         onEdit={openEdit}
+        onUnassign={(m) => setConfirmUnassign(m)}
       />
       <ConfirmDialog
         open={!!confirmMember}
@@ -482,6 +504,14 @@ export default function Team() {
         confirmLabel="Hiq"
         onConfirm={removeMember}
         onCancel={() => setConfirmMember(null)}
+      />
+      <ConfirmDialog
+        open={!!confirmUnassign}
+        title="Hiq nga ekipi im"
+        description={confirmUnassign ? `Jeni të sigurt që doni të hiqni "${confirmUnassign.full_name || confirmUnassign.email}" nga ekipi juaj? Operatori do të mbetet në kompani pa team leader.` : ""}
+        confirmLabel="Hiq"
+        onConfirm={unassignOperator}
+        onCancel={() => setConfirmUnassign(null)}
       />
     </div>
   );
@@ -495,6 +525,7 @@ function MemberList({
   teamLeaders,
   onRemove,
   onEdit,
+  onUnassign,
 }: {
   members: Member[];
   canManage: boolean;
@@ -503,6 +534,7 @@ function MemberList({
   teamLeaders: { id: string; full_name: string | null; email: string }[];
   onRemove: (m: Member) => void;
   onEdit: (m: Member) => void;
+  onUnassign: (m: Member) => void;
 }) {
   if (members.length === 0) return (
     <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">Asnjë anëtar.</CardContent></Card>
@@ -559,9 +591,19 @@ function MemberList({
               </DropdownMenu>
             )}
             {!canManage && isTeamLeader && m.role === "operator" && m.team_leader_id === currentUserId && (
-              <Button variant="ghost" size="icon" className="shrink-0" onClick={() => onEdit(m)} title="Ndrysho fjalëkalimin">
-                <Pencil className="w-4 h-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="shrink-0"><MoreHorizontal className="w-4 h-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit(m)}>
+                    <Pencil className="w-4 h-4 mr-2" />Ndrysho fjalëkalimin
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => onUnassign(m)}>
+                    <UserMinus className="w-4 h-4 mr-2" />Hiq nga ekipi im
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         ))}
