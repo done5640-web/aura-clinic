@@ -179,29 +179,29 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
   // ── Header band ──
   w.rect(0, PAGE_H - 110, PAGE_W, 110, INK);
-  w.y = PAGE_H - 46;
-  w.text(data.clinicName.toUpperCase(), MARGIN, 20, { font: w.bold, color: WHITE });
-  w.y -= 18;
+  w.y = PAGE_H - 48;
+  w.text(data.clinicName.toUpperCase(), MARGIN, 24, { font: w.bold, color: WHITE });
+  w.y -= 20;
   const subParts = [data.clinicAddress, data.clinicPhone, data.clinicEmail].filter(Boolean);
   if (subParts.length) {
-    w.text(subParts.join("   ·   "), MARGIN, 8.5, { color: rgb(0.85, 0.85, 0.85) });
+    w.text(subParts.join("   ·   "), MARGIN, 10, { color: rgb(0.85, 0.85, 0.85) });
   }
-  w.y = PAGE_H - 46;
-  w.textRight(t.quote, PAGE_W - MARGIN, 18, { font: w.bold, color: GOLD });
+  w.y = PAGE_H - 48;
+  w.textRight(t.quote, PAGE_W - MARGIN, 21, { font: w.bold, color: GOLD });
 
-  w.y = PAGE_H - 140;
+  w.y = PAGE_H - 142;
 
   // ── Patient / Date / Valid-until block ──
   const colDateX = PAGE_W / 2;
-  const colValidX = PAGE_W - MARGIN - 130;
-  w.text(t.patient, MARGIN, 8, { font: w.bold, color: MUTED });
-  w.text(t.date, colDateX, 8, { font: w.bold, color: MUTED });
-  if (data.validUntil) w.text(t.validUntil, colValidX, 8, { font: w.bold, color: MUTED });
-  w.y -= 16;
-  w.text(data.patientName, MARGIN, 13, { font: w.bold });
-  w.text(data.date, colDateX, 13, { font: w.bold });
-  if (data.validUntil) w.text(data.validUntil, colValidX, 13, { font: w.bold, color: GOLD });
+  const colValidX = PAGE_W - MARGIN - 140;
+  w.text(t.patient, MARGIN, 9.5, { font: w.bold, color: MUTED });
+  w.text(t.date, colDateX, 9.5, { font: w.bold, color: MUTED });
+  if (data.validUntil) w.text(t.validUntil, colValidX, 9.5, { font: w.bold, color: MUTED });
   w.y -= 18;
+  w.text(data.patientName, MARGIN, 15.5, { font: w.bold });
+  w.text(data.date, colDateX, 15.5, { font: w.bold });
+  if (data.validUntil) w.text(data.validUntil, colValidX, 15.5, { font: w.bold, color: GOLD });
+  w.y -= 20;
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, GOLD, 1.4);
   w.y -= 24;
 
@@ -217,22 +217,22 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   const colServiceMaxX = colQtyRight - 50; // leave room for the qty column
 
   const drawTableHeader = () => {
-    w.rect(MARGIN, w.y - 6, contentW, 22, INK);
-    w.text(t.service, colService + 8, 8.5, { font: w.bold, color: WHITE });
-    w.textRight(t.qty, colQtyRight, 8.5, { font: w.bold, color: WHITE });
-    w.textRight(t.price, colUnitRight, 8.5, { font: w.bold, color: WHITE });
-    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, 8.5, { font: w.bold, color: WHITE });
-    w.textRight(t.total, colTotalRight, 8.5, { font: w.bold, color: WHITE });
-    w.y -= 22;
+    w.rect(MARGIN, w.y - 8, contentW, 26, INK);
+    w.text(t.service, colService + 8, 10, { font: w.bold, color: WHITE });
+    w.textRight(t.qty, colQtyRight, 10, { font: w.bold, color: WHITE });
+    w.textRight(t.price, colUnitRight, 10, { font: w.bold, color: WHITE });
+    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, 10, { font: w.bold, color: WHITE });
+    w.textRight(t.total, colTotalRight, 10, { font: w.bold, color: WHITE });
+    w.y -= 26;
   };
 
   const drawSectionHeader = (label: string) => {
-    w.ensureSpace(26);
-    const bandH = 22;
+    w.ensureSpace(30);
+    const bandH = 26;
     w.rect(MARGIN, w.y - bandH, contentW, bandH, GOLD);
-    w.y -= bandH - 8;
-    w.text(label.toUpperCase(), colService + 8, 7, { font: w.bold, color: WHITE });
-    w.y -= 8;
+    w.y -= bandH - 9;
+    w.text(label.toUpperCase(), colService + 8, 8.5, { font: w.bold, color: WHITE });
+    w.y -= 9;
   };
 
   // group items by section, preserving order of first appearance
@@ -249,8 +249,9 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
   let grandTotal = 0;
   let zebraIdx = 0;
-  const LINE_GAP = 12;       // gap between wrapped lines within a cell
-  const ROW_VPAD = 9;        // vertical padding above + below text block, each side
+  const ROW_FONT = 9.5;
+  const LINE_GAP = 14.5;     // gap between wrapped lines within a cell
+  const ROW_VPAD = 11;       // vertical padding above + below text block, each side
   const ZEBRA_BG = rgb(0.965, 0.955, 0.935);
 
   for (const sec of sections) {
@@ -263,7 +264,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
       let cur = "";
       for (const word of words) {
         const candidate = cur ? `${cur} ${word}` : word;
-        if (w.font.widthOfTextAtSize(candidate, 9.5) <= maxServiceW) cur = candidate;
+        if (w.font.widthOfTextAtSize(candidate, ROW_FONT) <= maxServiceW) cur = candidate;
         else { if (cur) serviceLines.push(cur); cur = word; }
       }
       if (cur) serviceLines.push(cur);
@@ -271,11 +272,11 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
       // total row height = padding + text block height (text baseline-to-baseline)
       const textBlockH = (serviceLines.length - 1) * LINE_GAP;
-      const rowH = ROW_VPAD * 2 + textBlockH + 8; // +8 ~ cap height above first baseline
+      const rowH = ROW_VPAD * 2 + textBlockH + 9; // +9 ~ cap height above first baseline
 
       w.ensureSpace(rowH + 4);
       const rowTopY = w.y;
-      const firstBaselineY = rowTopY - ROW_VPAD - 8;
+      const firstBaselineY = rowTopY - ROW_VPAD - 9;
 
       // zebra band spans the exact same box the text is drawn inside
       if (zebraIdx % 2 === 1) w.rect(MARGIN, rowTopY - rowH, contentW, rowH, ZEBRA_BG);
@@ -285,16 +286,16 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
       const discLabel = discountLabel(it, currency);
 
       w.y = firstBaselineY;
-      w.text(serviceLines[0], colService + 8, 7.5);
-      w.textRight(it.qty || "1", colQtyRight, 7.5);
-      w.textRight(money(it.unit_price, currency), colUnitRight, 7.5);
-      if (discLabel) w.textRight(discLabel, colDiscountRight, 7.5, { color: GOLD });
-      w.textRight(money(rowTotal, currency), colTotalRight, 7.5, { font: w.bold });
+      w.text(serviceLines[0], colService + 8, ROW_FONT);
+      w.textRight(it.qty || "1", colQtyRight, ROW_FONT);
+      w.textRight(money(it.unit_price, currency), colUnitRight, ROW_FONT);
+      if (discLabel) w.textRight(discLabel, colDiscountRight, ROW_FONT, { color: GOLD });
+      w.textRight(money(rowTotal, currency), colTotalRight, ROW_FONT, { font: w.bold });
 
       // remaining wrapped lines, each on its own line beneath the first
       for (let i = 1; i < serviceLines.length; i++) {
         w.y = firstBaselineY - i * LINE_GAP;
-        w.text(serviceLines[i], colService + 8, 7.5);
+        w.text(serviceLines[i], colService + 8, ROW_FONT);
       }
 
       grandTotal += rowTotal;
@@ -307,27 +308,27 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, LINE, 0.75);
 
   // ── Total ── box sits entirely below the closing rule, with a clear gap
-  const TOTAL_GAP = 14;   // space between table rule and total box
-  const totalBoxH = 28;
+  const TOTAL_GAP = 16;   // space between table rule and total box
+  const totalBoxH = 34;
   w.ensureSpace(TOTAL_GAP + totalBoxH + 10);
   const totalBoxTop = w.y - TOTAL_GAP;
-  const totalBoxW = 220;
+  const totalBoxW = 240;
   const totalBoxX = MARGIN + contentW - totalBoxW;
   w.rect(totalBoxX, totalBoxTop - totalBoxH, totalBoxW, totalBoxH, INK);
-  w.y = totalBoxTop - totalBoxH / 2 - 3; // vertically center the label/value in the box
-  w.text(t.total, totalBoxX + 14, 6, { font: w.bold, color: WHITE });
-  w.textRight(money(grandTotal, currency), colTotalRight - 14, 6, { font: w.bold, color: GOLD });
-  w.y = totalBoxTop - totalBoxH - 12;
+  w.y = totalBoxTop - totalBoxH / 2 - 4; // vertically center the label/value in the box
+  w.text(t.total, totalBoxX + 16, 8, { font: w.bold, color: WHITE });
+  w.textRight(money(grandTotal, currency), colTotalRight - 14, 8, { font: w.bold, color: GOLD });
+  w.y = totalBoxTop - totalBoxH - 14;
 
   if (data.notes && data.notes.trim()) {
-    w.ensureSpace(40);
-    w.text(t.notes, MARGIN, 8, { font: w.bold, color: MUTED });
-    w.y -= 14;
-    const noteLines = wrapText(data.notes, w.font, 9, contentW);
+    w.ensureSpace(44);
+    w.text(t.notes, MARGIN, 9.5, { font: w.bold, color: MUTED });
+    w.y -= 16;
+    const noteLines = wrapText(data.notes, w.font, 10.5, contentW);
     for (const line of noteLines) {
-      w.ensureSpace(13);
-      w.text(line, MARGIN, 9);
-      w.y -= 13;
+      w.ensureSpace(15);
+      w.text(line, MARGIN, 10.5);
+      w.y -= 15;
     }
     w.y -= 8;
   }
@@ -338,15 +339,15 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, LINE);
   w.y -= 20;
 
-  const BULLET_INDENT = 12;
-  const SIZE = 8.5;
-  const LEADING = 11.5;
+  const BULLET_INDENT = 14;
+  const SIZE = 10.5;
+  const LEADING = 14;
 
   /** Renders **bold**-marked, optionally "- "-bulleted paragraph lines under a gold title. */
   const footerSection = (title: string, lines: string[]) => {
-    w.ensureSpace(16 + lines.length * LEADING);
-    w.text(title.toUpperCase(), MARGIN, 9, { font: w.bold, color: GOLD });
-    w.y -= 15;
+    w.ensureSpace(18 + lines.length * LEADING);
+    w.text(title.toUpperCase(), MARGIN, 11, { font: w.bold, color: GOLD });
+    w.y -= 18;
     for (const raw of lines) {
       const isBullet = raw.startsWith("- ");
       const line = isBullet ? raw.slice(2) : raw;
@@ -354,14 +355,14 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
       const maxW = contentW - (isBullet ? BULLET_INDENT : 0);
       const wrapped = wrapTokens(tokenize(line), w.font, w.bold, SIZE, maxW);
       wrapped.forEach((tl, i) => {
-        w.ensureSpace(12);
+        w.ensureSpace(14);
         if (isBullet && i === 0) w.text("•", MARGIN, SIZE, { color: MUTED });
         w.drawTokenLine(tl, x, SIZE, MUTED);
         w.y -= LEADING;
       });
-      w.y -= 3; // paragraph gap
+      w.y -= 4; // paragraph gap
     }
-    w.y -= 7;
+    w.y -= 8;
   };
 
   const serviceLines = data.servicesChecklist
@@ -374,10 +375,10 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   // Contact / email / website line, at the very end
   const infoLines = [data.contactLine, data.emailLine, data.websiteLine].filter((l): l is string => !!l && l.trim().length > 0);
   if (infoLines.length) {
-    w.ensureSpace(10 + infoLines.length * 12);
+    w.ensureSpace(12 + infoLines.length * 15);
     for (const line of infoLines) {
-      w.text(line, MARGIN, 9, { font: w.bold, color: INK });
-      w.y -= 13;
+      w.text(line, MARGIN, 11, { font: w.bold, color: INK });
+      w.y -= 16;
     }
     w.y -= 6;
   }

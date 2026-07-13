@@ -8,6 +8,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis
 import { fetchAll } from "@/lib/fetchAll";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { fmtDate } from "@/lib/dateFormat";
 
 const COLORS = ["#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b","#ef4444","#ec4899","#3b82f6","#84cc16"];
 
@@ -221,7 +222,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={cn("text-xs", overdue ? "text-red-500 font-medium" : "text-muted-foreground")}>
-                            {t.due_date ? new Date(t.due_date).toLocaleDateString("sq-AL") : ""}
+                            {t.due_date ? fmtDate(t.due_date) : ""}
                           </span>
                           <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
@@ -260,7 +261,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleDateString("sq-AL")}</span>
+                    <span className="text-xs text-muted-foreground">{fmtDate(a.created_at)}</span>
                     <ArrowUpRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </Link>

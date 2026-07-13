@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChecklistItem, generatePreventivPdf, QuoteItem } from "@/lib/generatePreventivPdf";
 import { PreventivLang, PREVENTIV_STRINGS } from "@/lib/preventivTranslations";
+import { fmtDate } from "@/lib/dateFormat";
 
 const LANGUAGE_OPTIONS: { value: PreventivLang; label: string; flag: string }[] = [
   { value: "en", label: "English", flag: "🇬🇧" },
@@ -345,7 +346,7 @@ export default function PreventivEditor() {
               >
                 <FileText className="w-3.5 h-3.5" />
                 {q.title} · €{Number(q.total).toLocaleString()}
-                <span className="text-muted-foreground">{new Date(q.created_at).toLocaleDateString("sq-AL")}</span>
+                <span className="text-muted-foreground">{fmtDate(q.created_at)}</span>
               </button>
             ))}
           </div>

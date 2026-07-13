@@ -25,6 +25,7 @@ import PhoneInput from "@/components/PhoneInput";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { stageColorClass } from "@/lib/stage-colors";
 import { compressForUpload } from "@/lib/compressFile";
+import { fmtDate, fmtDateTime, fmtTime } from "@/lib/dateFormat";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   note: "Shënim", call: "Telefonatë", email: "Email",
@@ -622,7 +623,7 @@ export default function LeadDetail() {
                               </span>
                               <span className="text-xs font-semibold text-foreground">{author?.full_name || author?.email || "Sistemi"}</span>
                               <span className="text-xs text-muted-foreground ml-auto">
-                                {new Date(a.created_at).toLocaleString("sq-AL")}
+                                {fmtDateTime(a.created_at)}
                                 {a.updated_at && " · redaktuar"}
                               </span>
                               {canEditThis && !isEditing && (
@@ -703,7 +704,7 @@ export default function LeadDetail() {
                             <p className={cn("text-sm font-medium", t.completed && "line-through text-muted-foreground")}>{t.title}</p>
                             {t.due_date && (
                               <p className={cn("text-xs mt-0.5", overdue ? "text-red-500 font-semibold" : "text-muted-foreground")}>
-                                {overdue && "Afati kaloi — "}{new Date(t.due_date).toLocaleString("sq-AL")}
+                                {overdue && "Afati kaloi — "}{fmtDateTime(t.due_date)}
                               </p>
                             )}
                           </div>
@@ -736,7 +737,7 @@ export default function LeadDetail() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold">{ev.title}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{new Date(ev.scheduled_at).toLocaleString("sq-AL")}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{fmtDateTime(ev.scheduled_at)}</p>
                           {lead.phone && (
                             <a href={`tel:${lead.phone}`} className="text-xs text-foreground hover:underline font-medium mt-0.5 block">
                               {lead.phone}
@@ -803,7 +804,7 @@ export default function LeadDetail() {
                             )}
                             <p className="text-xs text-muted-foreground">
                               {att.file_size ? `${(att.file_size / 1024).toFixed(1)} KB · ` : ""}
-                              {new Date(att.created_at).toLocaleDateString("sq-AL")}
+                              {fmtDate(att.created_at)}
                             </p>
                           </div>
                           {isImage && url && (
@@ -853,7 +854,7 @@ export default function LeadDetail() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate">{q.title}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(q.created_at).toLocaleDateString("sq-AL")} · {Array.isArray(q.items) ? q.items.length : 0} shërbime
+                            {fmtDate(q.created_at)} · {Array.isArray(q.items) ? q.items.length : 0} shërbime
                           </p>
                         </div>
                         <span className="text-sm font-bold text-foreground shrink-0">€{Number(q.total).toLocaleString()}</span>

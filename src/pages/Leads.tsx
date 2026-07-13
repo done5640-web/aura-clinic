@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { stageTextBadge, stageColorClass } from "@/lib/stage-colors";
 import { getPhoneCountry } from "@/lib/phoneCountry";
 import { recentStatusChanges } from "@/lib/recentStatusChanges";
+import { fmtDate, fmtDateTime } from "@/lib/dateFormat";
 import { toast } from "sonner";
 import ImportLeadsDialog from "@/components/ImportLeadsDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -141,9 +142,12 @@ export default function Leads() {
       ]);
       if (loadCancelRef.current) return;
       if (le) { toast.error("Gabim gjatë ngarkimit: " + le.message); setLoading(false); return; }
-      leads = (l ?? []) as Lead[]; stagesData = s ?? []; membersData = p ?? [];
+      leads = (l ?? []) as Lead[]; stagesData = s ?? [];
       const roleMap = new Map<string, string>();
       (roleRows ?? []).forEach((r: any) => roleMap.set(r.user_id, r.role));
+      // Drop profiles with no matching user_roles row — these are broken/orphaned
+      // accounts (e.g. never finished signup) and shouldn't appear as assignable.
+      membersData = (p ?? []).filter((prof: any) => roleMap.has(prof.id));
       const tls = (p ?? []).filter((prof: any) => roleMap.get(prof.id) === "team_leader");
       const ops = (p ?? []).filter((prof: any) => roleMap.get(prof.id) === "operator");
       assignTargetsData = [
@@ -615,9 +619,9 @@ export default function Leads() {
                           <span className="text-xs text-muted-foreground">
                             {createdFrom || createdTo
                               ? <>
-                                  {createdFrom && new Date(createdFrom + "T12:00:00").toLocaleDateString("sq-AL")}
+                                  {createdFrom && fmtDate(createdFrom + "T12:00:00")}
                                   {createdFrom && createdTo && <span className="mx-1 opacity-50">→</span>}
-                                  {createdTo && new Date(createdTo + "T12:00:00").toLocaleDateString("sq-AL")}
+                                  {createdTo && fmtDate(createdTo + "T12:00:00")}
                                 </>
                               : <span className="italic">Asnjë datë e zgjedhur</span>
                             }
@@ -689,9 +693,9 @@ export default function Leads() {
                           <span className="text-xs text-muted-foreground">
                             {dateFrom || dateTo
                               ? <>
-                                  {dateFrom && new Date(dateFrom + "T12:00:00").toLocaleDateString("sq-AL")}
+                                  {dateFrom && fmtDate(dateFrom + "T12:00:00")}
                                   {dateFrom && dateTo && <span className="mx-1 opacity-50">→</span>}
-                                  {dateTo && new Date(dateTo + "T12:00:00").toLocaleDateString("sq-AL")}
+                                  {dateTo && fmtDate(dateTo + "T12:00:00")}
                                 </>
                               : <span className="italic">Asnjë datë e zgjedhur</span>
                             }
@@ -766,7 +770,7 @@ export default function Leads() {
 
                       {/* Data e shtimit — right after Email */}
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer" onClick={() => navigate(`/leads/${l.id}`)}>
-                        <div>{new Date(l.created_at).toLocaleDateString("sq-AL")}</div>
+                        <div>{fmtDate(l.created_at)}</div>
                         <div className="opacity-60">{new Date(l.created_at).toLocaleTimeString("sq-AL", { hour: "2-digit", minute: "2-digit" })}</div>
                       </TableCell>
 
@@ -778,7 +782,7 @@ export default function Leads() {
                           title="Shiko historikun e ndryshimeve"
                         >
                           <div className="flex items-center gap-1">
-                            <span>{new Date(l.updated_at).toLocaleDateString("sq-AL")}</span>
+                            <span>{fmtDate(l.updated_at)}</span>
                             <History className="w-3 h-3 opacity-0 group-hover/hist:opacity-100 transition-opacity" />
                           </div>
                           <div className="opacity-60">{new Date(l.updated_at).toLocaleTimeString("sq-AL", { hour: "2-digit", minute: "2-digit" })}</div>
@@ -958,7 +962,7 @@ export default function Leads() {
                   {historyActs.map((a) => (
                     <tr key={a.id} className="hover:bg-muted/40 transition-colors">
                       <td className="py-2.5 px-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(a.created_at).toLocaleString("sq-AL")}
+                        {fmtDateTime(a.created_at)}
                       </td>
                       <td className="py-2.5 px-3">
                         <span className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-xs font-semibold whitespace-nowrap">
