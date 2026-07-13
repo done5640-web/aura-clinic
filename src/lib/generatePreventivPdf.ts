@@ -55,17 +55,17 @@ const PAGE_W = 595.28; // A4
 const PAGE_H = 841.89;
 const MARGIN = 48;
 
-const INK = rgb(0.13, 0.12, 0.11);          // near-black warm ink
-const MUTED = rgb(0.45, 0.43, 0.4);
-const GOLD = rgb(0.72, 0.55, 0.18);          // accent matching sidebar amber
-const GOLD_LIGHT = rgb(0.97, 0.94, 0.86);
-const LINE = rgb(0.85, 0.83, 0.79);
+const INK = rgb(0.1, 0.1, 0.1);             // near-black text — high contrast for readability
+const MUTED = rgb(0.32, 0.34, 0.38);         // secondary text — still dark enough to read easily
+const NAVY = rgb(0.059, 0.141, 0.251);       // header band / section bands background
+const GOLD = rgb(0.71, 0.53, 0.05);          // accent — used sparingly for totals/highlights
+const LINE = rgb(0.82, 0.83, 0.85);
 const WHITE = rgb(1, 1, 1);
 
 function money(v: string | number, currency: string) {
   const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.,-]/g, "").replace(",", "."));
   if (!isFinite(n)) return String(v);
-  const symbol = currency === "EUR" ? "€" : currency;
+  const symbol = currency === "EUR" ? "€ " : `${currency} `;
   return `${symbol}${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
@@ -131,6 +131,15 @@ class Writer {
     this.newPage();
   }
 
+  /** Draws a PNG image scaled to fit within maxW x maxH, anchored top-left at (x, topY), preserving aspect ratio. */
+  drawImageFit(image: Awaited<ReturnType<PDFDocument["embedPng"]>>, x: number, topY: number, maxW: number, maxH: number) {
+    const scale = Math.min(maxW / image.width, maxH / image.height);
+    const w = image.width * scale;
+    const h = image.height * scale;
+    this.page.drawImage(image, { x, y: topY - h, width: w, height: h });
+    return { width: w, height: h };
+  }
+
   newPage() {
     this.page = this.doc.addPage([PAGE_W, PAGE_H]);
     this.y = PAGE_H - MARGIN;
@@ -178,61 +187,81 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   const t = PREVENTIV_STRINGS[data.language ?? "en"];
 
   // ── Header band ──
-  w.rect(0, PAGE_H - 110, PAGE_W, 110, INK);
-  w.y = PAGE_H - 48;
-  w.text(data.clinicName.toUpperCase(), MARGIN, 24, { font: w.bold, color: WHITE });
-  w.y -= 20;
+  const HEADER_H = 165;
+  w.rect(0, PAGE_H - HEADER_H, PAGE_W, HEADER_H, NAVY);
+
+  let logoDrawn = false;
+  try {
+    const logoBytes = await fetch("/logo-aura-vita.png").then((r) => r.arrayBuffer());
+    const logoImage = await w.doc.embedPng(logoBytes);
+    w.drawImageFit(logoImage, MARGIN, PAGE_H - 18, 220, HEADER_H - 30);
+    logoDrawn = true;
+  } catch {
+    // fall back to text below if the logo can't be loaded/embedded
+  }
+
+  w.y = PAGE_H - 50;
+  if (!logoDrawn) {
+    w.text(data.clinicName.toUpperCase(), MARGIN, 28, { font: w.bold, color: WHITE });
+  }
+  w.y -= 24;
   const subParts = [data.clinicAddress, data.clinicPhone, data.clinicEmail].filter(Boolean);
   if (subParts.length) {
-    w.text(subParts.join("   ·   "), MARGIN, 10, { color: rgb(0.85, 0.85, 0.85) });
+    w.text(subParts.join("   ·   "), MARGIN, 11.5, { color: rgb(0.85, 0.85, 0.85) });
   }
-  w.y = PAGE_H - 48;
-  w.textRight(t.quote, PAGE_W - MARGIN, 21, { font: w.bold, color: GOLD });
+  w.y = PAGE_H - 50;
+  w.textRight(t.quote, PAGE_W - MARGIN, 24, { font: w.bold, color: GOLD });
 
-  w.y = PAGE_H - 142;
+  w.y = PAGE_H - HEADER_H - 36;
 
   // ── Patient / Date / Valid-until block ──
   const colDateX = PAGE_W / 2;
-  const colValidX = PAGE_W - MARGIN - 140;
-  w.text(t.patient, MARGIN, 9.5, { font: w.bold, color: MUTED });
-  w.text(t.date, colDateX, 9.5, { font: w.bold, color: MUTED });
-  if (data.validUntil) w.text(t.validUntil, colValidX, 9.5, { font: w.bold, color: MUTED });
-  w.y -= 18;
-  w.text(data.patientName, MARGIN, 15.5, { font: w.bold });
-  w.text(data.date, colDateX, 15.5, { font: w.bold });
-  if (data.validUntil) w.text(data.validUntil, colValidX, 15.5, { font: w.bold, color: GOLD });
-  w.y -= 20;
-  w.lineH(MARGIN, PAGE_W - MARGIN, w.y, GOLD, 1.4);
+  const colValidX = PAGE_W - MARGIN - 150;
+  w.text(t.patient, MARGIN, 11, { font: w.bold, color: MUTED });
+  w.text(t.date, colDateX, 11, { font: w.bold, color: MUTED });
+  if (data.validUntil) w.text(t.validUntil, colValidX, 11, { font: w.bold, color: MUTED });
+  w.y -= 21;
+  w.text(data.patientName, MARGIN, 18.5, { font: w.bold });
+  w.text(data.date, colDateX, 18.5, { font: w.bold });
+  if (data.validUntil) w.text(data.validUntil, colValidX, 18.5, { font: w.bold, color: GOLD });
   w.y -= 24;
+  w.lineH(MARGIN, PAGE_W - MARGIN, w.y, GOLD, 1.4);
+  w.y -= 26;
 
   const hasDiscounts = data.items.some((it) => it.discountEnabled && it.discountValue);
 
-  // ── Table columns ── numeric columns are right edges so values never overflow
+  // ── Table columns ── built right-to-left so each numeric column gets just
+  // enough room for its widest realistic value at large-print size, and the
+  // service name keeps whatever space is left.
   const TABLE_RIGHT_PAD = 10;
   const colService = MARGIN;
-  const colQtyRight = MARGIN + contentW - (hasDiscounts ? 260 : 190);
-  const colUnitRight = MARGIN + contentW - (hasDiscounts ? 165 : 95);
-  const colDiscountRight = MARGIN + contentW - 95;
   const colTotalRight = MARGIN + contentW - TABLE_RIGHT_PAD;
-  const colServiceMaxX = colQtyRight - 50; // leave room for the qty column
+  const TOTAL_W = 105;
+  const colDiscountRight = colTotalRight - TOTAL_W;
+  const DISCOUNT_W = 85;
+  const colUnitRight = hasDiscounts ? colDiscountRight - DISCOUNT_W : colTotalRight - TOTAL_W;
+  const PRICE_W = 100;
+  const colQtyRight = colUnitRight - PRICE_W;
+  const QTY_W = 30;
+  const colServiceMaxX = colQtyRight - QTY_W;
 
   const drawTableHeader = () => {
-    w.rect(MARGIN, w.y - 8, contentW, 26, INK);
-    w.text(t.service, colService + 8, 10, { font: w.bold, color: WHITE });
-    w.textRight(t.qty, colQtyRight, 10, { font: w.bold, color: WHITE });
-    w.textRight(t.price, colUnitRight, 10, { font: w.bold, color: WHITE });
-    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, 10, { font: w.bold, color: WHITE });
-    w.textRight(t.total, colTotalRight, 10, { font: w.bold, color: WHITE });
-    w.y -= 26;
+    w.rect(MARGIN, w.y - 11, contentW, 40, NAVY);
+    w.text(t.service, colService + 8, 15.5, { font: w.bold, color: WHITE });
+    w.textRight(t.qty, colQtyRight, 15.5, { font: w.bold, color: WHITE });
+    w.textRight(t.price, colUnitRight, 15.5, { font: w.bold, color: WHITE });
+    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, 15.5, { font: w.bold, color: WHITE });
+    w.textRight(t.total, colTotalRight, 15.5, { font: w.bold, color: WHITE });
+    w.y -= 40;
   };
 
   const drawSectionHeader = (label: string) => {
-    w.ensureSpace(30);
-    const bandH = 26;
-    w.rect(MARGIN, w.y - bandH, contentW, bandH, GOLD);
-    w.y -= bandH - 9;
-    w.text(label.toUpperCase(), colService + 8, 8.5, { font: w.bold, color: WHITE });
-    w.y -= 9;
+    w.ensureSpace(44);
+    const bandH = 40;
+    w.rect(MARGIN, w.y - bandH, contentW, bandH, NAVY);
+    w.y -= bandH - 13;
+    w.text(label.toUpperCase(), colService + 8, 14, { font: w.bold, color: WHITE });
+    w.y -= 13;
   };
 
   // group items by section, preserving order of first appearance
@@ -249,9 +278,9 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
   let grandTotal = 0;
   let zebraIdx = 0;
-  const ROW_FONT = 9.5;
-  const LINE_GAP = 14.5;     // gap between wrapped lines within a cell
-  const ROW_VPAD = 11;       // vertical padding above + below text block, each side
+  const ROW_FONT = 20;
+  const LINE_GAP = 27;       // gap between wrapped lines within a cell
+  const ROW_VPAD = 17;       // vertical padding above + below text block, each side
   const ZEBRA_BG = rgb(0.965, 0.955, 0.935);
 
   for (const sec of sections) {
@@ -272,11 +301,11 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
       // total row height = padding + text block height (text baseline-to-baseline)
       const textBlockH = (serviceLines.length - 1) * LINE_GAP;
-      const rowH = ROW_VPAD * 2 + textBlockH + 9; // +9 ~ cap height above first baseline
+      const rowH = ROW_VPAD * 2 + textBlockH + 18; // +18 ~ cap height above first baseline
 
       w.ensureSpace(rowH + 4);
       const rowTopY = w.y;
-      const firstBaselineY = rowTopY - ROW_VPAD - 9;
+      const firstBaselineY = rowTopY - ROW_VPAD - 18;
 
       // zebra band spans the exact same box the text is drawn inside
       if (zebraIdx % 2 === 1) w.rect(MARGIN, rowTopY - rowH, contentW, rowH, ZEBRA_BG);
@@ -308,27 +337,27 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, LINE, 0.75);
 
   // ── Total ── box sits entirely below the closing rule, with a clear gap
-  const TOTAL_GAP = 16;   // space between table rule and total box
-  const totalBoxH = 34;
+  const TOTAL_GAP = 20;   // space between table rule and total box
+  const totalBoxH = 58;
   w.ensureSpace(TOTAL_GAP + totalBoxH + 10);
   const totalBoxTop = w.y - TOTAL_GAP;
-  const totalBoxW = 240;
+  const totalBoxW = 300;
   const totalBoxX = MARGIN + contentW - totalBoxW;
-  w.rect(totalBoxX, totalBoxTop - totalBoxH, totalBoxW, totalBoxH, INK);
-  w.y = totalBoxTop - totalBoxH / 2 - 4; // vertically center the label/value in the box
-  w.text(t.total, totalBoxX + 16, 8, { font: w.bold, color: WHITE });
-  w.textRight(money(grandTotal, currency), colTotalRight - 14, 8, { font: w.bold, color: GOLD });
-  w.y = totalBoxTop - totalBoxH - 14;
+  w.rect(totalBoxX, totalBoxTop - totalBoxH, totalBoxW, totalBoxH, NAVY);
+  w.y = totalBoxTop - totalBoxH / 2 - 7; // vertically center the label/value in the box
+  w.text(t.total, totalBoxX + 18, 13, { font: w.bold, color: WHITE });
+  w.textRight(money(grandTotal, currency), colTotalRight - 14, 22, { font: w.bold, color: WHITE });
+  w.y = totalBoxTop - totalBoxH - 18;
 
   if (data.notes && data.notes.trim()) {
-    w.ensureSpace(44);
-    w.text(t.notes, MARGIN, 9.5, { font: w.bold, color: MUTED });
-    w.y -= 16;
-    const noteLines = wrapText(data.notes, w.font, 10.5, contentW);
+    w.ensureSpace(50);
+    w.text(t.notes, MARGIN, 11.5, { font: w.bold, color: MUTED });
+    w.y -= 19;
+    const noteLines = wrapText(data.notes, w.font, 12.5, contentW);
     for (const line of noteLines) {
-      w.ensureSpace(15);
-      w.text(line, MARGIN, 10.5);
-      w.y -= 15;
+      w.ensureSpace(18);
+      w.text(line, MARGIN, 12.5);
+      w.y -= 18;
     }
     w.y -= 8;
   }
@@ -339,15 +368,15 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, LINE);
   w.y -= 20;
 
-  const BULLET_INDENT = 14;
-  const SIZE = 10.5;
-  const LEADING = 14;
+  const BULLET_INDENT = 18;
+  const SIZE = 15;
+  const LEADING = 20;
 
   /** Renders **bold**-marked, optionally "- "-bulleted paragraph lines under a gold title. */
   const footerSection = (title: string, lines: string[]) => {
-    w.ensureSpace(18 + lines.length * LEADING);
-    w.text(title.toUpperCase(), MARGIN, 11, { font: w.bold, color: GOLD });
-    w.y -= 18;
+    w.ensureSpace(26 + lines.length * LEADING);
+    w.text(title.toUpperCase(), MARGIN, 15.5, { font: w.bold, color: NAVY });
+    w.y -= 25;
     for (const raw of lines) {
       const isBullet = raw.startsWith("- ");
       const line = isBullet ? raw.slice(2) : raw;
@@ -355,14 +384,14 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
       const maxW = contentW - (isBullet ? BULLET_INDENT : 0);
       const wrapped = wrapTokens(tokenize(line), w.font, w.bold, SIZE, maxW);
       wrapped.forEach((tl, i) => {
-        w.ensureSpace(14);
-        if (isBullet && i === 0) w.text("•", MARGIN, SIZE, { color: MUTED });
-        w.drawTokenLine(tl, x, SIZE, MUTED);
+        w.ensureSpace(20);
+        if (isBullet && i === 0) w.text("•", MARGIN, SIZE, { color: INK });
+        w.drawTokenLine(tl, x, SIZE, INK);
         w.y -= LEADING;
       });
-      w.y -= 4; // paragraph gap
+      w.y -= 6; // paragraph gap
     }
-    w.y -= 8;
+    w.y -= 10;
   };
 
   const serviceLines = data.servicesChecklist
@@ -375,10 +404,10 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   // Contact / email / website line, at the very end
   const infoLines = [data.contactLine, data.emailLine, data.websiteLine].filter((l): l is string => !!l && l.trim().length > 0);
   if (infoLines.length) {
-    w.ensureSpace(12 + infoLines.length * 15);
+    w.ensureSpace(16 + infoLines.length * 22);
     for (const line of infoLines) {
-      w.text(line, MARGIN, 11, { font: w.bold, color: INK });
-      w.y -= 16;
+      w.text(line, MARGIN, 15, { font: w.bold, color: INK });
+      w.y -= 22;
     }
     w.y -= 6;
   }

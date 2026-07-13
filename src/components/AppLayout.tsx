@@ -42,7 +42,9 @@ export function FullPageLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4">
-        <MediqueLogo className="h-10 w-auto text-foreground" />
+        <div className="bg-[hsl(25,18%,8%)] rounded-xl px-10 py-6">
+          <MediqueLogo className="h-28 w-auto" />
+        </div>
         <div className="space-y-2 w-40">
           <Skeleton className="h-2.5 w-full rounded" />
           <Skeleton className="h-2.5 w-3/4 rounded" />
@@ -75,15 +77,15 @@ export default function AppLayout() {
 
         {/* Logo */}
         <div className={cn(
-          "h-14 flex items-center shrink-0 border-b border-[hsl(var(--sidebar-border))]",
-          collapsed ? "justify-center px-2" : "px-4"
+          "h-28 flex items-center justify-center shrink-0 border-b border-[hsl(var(--sidebar-border))]",
+          collapsed ? "px-2" : "px-4"
         )}>
           {collapsed ? (
             <div className="w-7 h-7 rounded-lg bg-[hsl(38,62%,52%)] flex items-center justify-center shrink-0">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
           ) : (
-            <MediqueLogo className="h-8 w-auto text-white" />
+            <MediqueLogo className="h-24 w-auto text-white" />
           )}
         </div>
 
@@ -134,8 +136,8 @@ export default function AppLayout() {
         {/* Header */}
         <header className="h-14 bg-background border-b flex items-center justify-between px-4 md:px-6 sticky top-0 z-20">
           {/* Mobile logo */}
-          <div className="md:hidden flex items-center">
-            <MediqueLogo className="h-7 w-auto text-foreground" />
+          <div className="md:hidden flex items-center bg-[hsl(25,18%,8%)] rounded-lg px-2.5 py-1">
+            <MediqueLogo className="h-10 w-auto" />
           </div>
 
           <div className="hidden md:block flex-1" />

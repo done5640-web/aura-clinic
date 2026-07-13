@@ -40,7 +40,7 @@ export default function AuthPage() {
 
         {/* Brand content over photo */}
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <MediqueLogo className="h-10 w-auto text-white" />
+          <MediqueLogo className="h-28 w-auto text-white" />
 
           <div className="space-y-4">
             <p className="text-white/40 text-xs font-medium tracking-[0.2em] uppercase">
@@ -64,9 +64,9 @@ export default function AuthPage() {
 
       {/* Right panel — login form */}
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[hsl(36,20%,97%)]">
-        {/* Mobile logo */}
-        <div className="lg:hidden mb-10">
-          <MediqueLogo className="h-10 w-auto text-foreground" />
+        {/* Mobile logo — navy pill so the logo's white text stays visible on this light background */}
+        <div className="lg:hidden mb-10 bg-[hsl(25,18%,8%)] rounded-xl px-10 py-6">
+          <MediqueLogo className="h-24 w-auto" />
         </div>
 
         <div className="w-full max-w-[360px] space-y-8">
