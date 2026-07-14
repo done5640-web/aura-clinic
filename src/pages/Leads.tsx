@@ -59,13 +59,13 @@ async function fetchAllLeads(
   }
 }
 
-const fmtDate = (d: Date) =>
+const toISODate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const datePresets = () => {
   const today = new Date();
   return {
-    today: { from: fmtDate(today), to: fmtDate(today) },
+    today: { from: toISODate(today), to: toISODate(today) },
   };
 };
 
@@ -609,8 +609,8 @@ export default function Leads() {
                             to: createdTo ? new Date(createdTo + "T12:00:00") : undefined,
                           }}
                           onSelect={(range) => {
-                            setCreatedFrom(range?.from ? fmtDate(range.from) : "");
-                            setCreatedTo(range?.to ? fmtDate(range.to) : "");
+                            setCreatedFrom(range?.from ? toISODate(range.from) : "");
+                            setCreatedTo(range?.to ? toISODate(range.to) : "");
                           }}
                           initialFocus
                           classNames={{ day_today: "font-normal" }}
@@ -683,8 +683,8 @@ export default function Leads() {
                             to: dateTo ? new Date(dateTo + "T12:00:00") : undefined,
                           }}
                           onSelect={(range) => {
-                            setDateFrom(range?.from ? fmtDate(range.from) : "");
-                            setDateTo(range?.to ? fmtDate(range.to) : "");
+                            setDateFrom(range?.from ? toISODate(range.from) : "");
+                            setDateTo(range?.to ? toISODate(range.to) : "");
                           }}
                           initialFocus
                           classNames={{ day_today: "font-normal" }}
