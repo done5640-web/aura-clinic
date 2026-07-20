@@ -62,11 +62,13 @@ const GOLD = rgb(0.71, 0.53, 0.05);          // accent — used sparingly for to
 const LINE = rgb(0.82, 0.83, 0.85);
 const WHITE = rgb(1, 1, 1);
 
+const CURRENCY_SYMBOLS: Record<string, string> = { EUR: "€", GBP: "£" };
+
 function money(v: string | number, currency: string) {
   const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.,-]/g, "").replace(",", "."));
   if (!isFinite(n)) return String(v);
-  const symbol = currency === "EUR" ? "€ " : `${currency} `;
-  return `${symbol}${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  const symbol = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+  return `${symbol} ${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 interface Token { text: string; bold: boolean }

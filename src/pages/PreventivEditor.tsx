@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -27,6 +28,13 @@ const LANGUAGE_OPTIONS: { value: PreventivLang; label: string; flag: string }[] 
   { value: "it", label: "Italiano", flag: "🇮🇹" },
   { value: "fr", label: "Français", flag: "🇫🇷" },
 ];
+
+const CURRENCY_OPTIONS: { value: string; label: string; symbol: string }[] = [
+  { value: "EUR", label: "Euro", symbol: "€" },
+  { value: "GBP", label: "Paund", symbol: "£" },
+];
+
+const CURRENCY_SYMBOLS: Record<string, string> = { EUR: "€", GBP: "£" };
 
 interface Row extends QuoteItem {
   _key: string;
@@ -76,6 +84,7 @@ export default function PreventivEditor() {
   const [company, setCompany] = useState<any>(null);
   const [title, setTitle] = useState("Preventiv");
   const [notes, setNotes] = useState("");
+  const [currency, setCurrency] = useState("EUR");
   const [rows, setRows] = useState<Row[]>([]);
   const [validUntil, setValidUntil] = useState("");
   const [contactLine, setContactLine] = useState(DEFAULT_CONTACT_LINE);
@@ -108,6 +117,7 @@ export default function PreventivEditor() {
         if (existing) {
           setTitle(existing.title);
           setNotes(existing.notes ?? "");
+          setCurrency(existing.currency ?? "EUR");
           setRows((existing.items as unknown as QuoteItem[]).map((it) => ({ ...it, _key: newKey() })));
           setValidUntil(existing.valid_until ?? "");
           setContactLine(existing.contact_line ?? DEFAULT_CONTACT_LINE);
@@ -208,6 +218,7 @@ export default function PreventivEditor() {
     date: fmtDDMMYYYY(new Date()),
     validUntil: fmtDate(validUntil),
     items: rows.filter((r) => r.service.trim()).map(({ _key, ...rest }) => rest),
+    currency,
     notes,
     language,
     contactLine,
@@ -227,7 +238,7 @@ export default function PreventivEditor() {
     const items = rows.filter((r) => r.service.trim()).map(({ _key, ...rest }) => rest);
     const payload = {
       lead_id: leadId, company_id: companyId, created_by: user?.id,
-      title: title.trim() || "Preventiv", items, total: grandTotal, notes: notes || null,
+      title: title.trim() || "Preventiv", items, currency, total: grandTotal, notes: notes || null,
       valid_until: validUntil || null,
       contact_line: contactLine || DEFAULT_CONTACT_LINE,
       email_line: emailLine || DEFAULT_EMAIL_LINE,
@@ -345,7 +356,7 @@ export default function PreventivEditor() {
                 )}
               >
                 <FileText className="w-3.5 h-3.5" />
-                {q.title} · €{Number(q.total).toLocaleString()}
+                {q.title} · {CURRENCY_SYMBOLS[q.currency ?? "EUR"] ?? q.currency}{Number(q.total).toLocaleString()}
                 <span className="text-muted-foreground">{fmtDate(q.created_at)}</span>
               </button>
             ))}
@@ -354,10 +365,25 @@ export default function PreventivEditor() {
       )}
 
       <div className="bg-card rounded-xl border border-border p-5 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Titulli</Label>
             <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Monedha</Label>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger className="mt-1 h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CURRENCY_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.symbol} {opt.label} ({opt.value})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Vlefshëm deri më (opsionale)</Label>
@@ -431,7 +457,7 @@ export default function PreventivEditor() {
                     className="h-8 text-sm"
                   />
                   <Input
-                    placeholder="€0"
+                    placeholder={`${CURRENCY_SYMBOLS[currency]}0`}
                     value={r.unit_price}
                     onChange={(e) => updateRow(r._key, { unit_price: e.target.value })}
                     className="h-8 text-sm"
@@ -456,13 +482,13 @@ export default function PreventivEditor() {
                           title="Kalo mes % dhe vlerë fikse"
                           className="h-8 px-1.5 rounded-md border border-border text-xs font-semibold text-muted-foreground hover:bg-muted flex items-center gap-0.5 shrink-0"
                         >
-                          {r.discountType === "fixed" ? "€" : <Percent className="w-3 h-3" />}
+                          {r.discountType === "fixed" ? CURRENCY_SYMBOLS[currency] : <Percent className="w-3 h-3" />}
                         </button>
                       </>
                     )}
                   </div>
                   <Input
-                    placeholder="€0"
+                    placeholder={`${CURRENCY_SYMBOLS[currency]}0`}
                     value={r.discountEnabled && r.discountValue ? String(rowDiscountedTotal(r)) : r.total}
                     onChange={(e) => updateRow(r._key, { total: e.target.value })}
                     readOnly={!!r.discountEnabled && !!r.discountValue}
@@ -561,7 +587,7 @@ export default function PreventivEditor() {
         <div className="flex items-center justify-between pt-3 border-t border-border">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Totali</p>
-            <p className="text-2xl font-bold">€{grandTotal.toLocaleString()}</p>
+            <p className="text-2xl font-bold">{CURRENCY_SYMBOLS[currency]}{grandTotal.toLocaleString()}</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={saveQuote} disabled={saving}>
