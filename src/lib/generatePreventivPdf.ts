@@ -1,4 +1,5 @@
-import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb, RGB } from "pdf-lib";
+import { PDFDocument, PDFFont, PDFPage, rgb, RGB } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import { PreventivLang, PREVENTIV_STRINGS } from "./preventivTranslations";
 
 export interface QuoteItem {
@@ -71,6 +72,52 @@ function money(v: string | number, currency: string) {
   return `${symbol} ${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
+/**
+ * Standard fonts (WinAnsi) only cover Latin-1. Text containing Hebrew, Cyrillic-adjacent
+ * extras, or other characters outside that range needs a Unicode font instead, else pdf-lib
+ * throws "WinAnsi cannot encode". We embed Noto Sans (broad Unicode coverage: Latin, Cyrillic,
+ * Greek, etc.) as the default and fall back to Noto Sans Hebrew per run of Hebrew-script text.
+ */
+interface FontSet { latin: PDFFont; latinBold: PDFFont; hebrew: PDFFont; hebrewBold: PDFFont }
+
+function isHebrewCodePoint(cp: number): boolean {
+  return cp >= 0x0591 && cp <= 0x05f4; // Hebrew block (letters, points, punctuation)
+}
+
+/** Splits text into runs of consecutive Hebrew vs. non-Hebrew characters, preserving order. */
+function splitScriptRuns(str: string): { text: string; hebrew: boolean }[] {
+  if (!str) return [];
+  const runs: { text: string; hebrew: boolean }[] = [];
+  let cur = "";
+  let curHebrew: boolean | null = null;
+  for (const ch of str) {
+    const heb = isHebrewCodePoint(ch.codePointAt(0) ?? 0);
+    if (curHebrew === null || heb === curHebrew) {
+      cur += ch;
+      curHebrew = heb;
+    } else {
+      runs.push({ text: cur, hebrew: curHebrew });
+      cur = ch;
+      curHebrew = heb;
+    }
+  }
+  if (cur) runs.push({ text: cur, hebrew: curHebrew ?? false });
+  return runs;
+}
+
+function fontFor(fonts: FontSet, hebrew: boolean, bold: boolean): PDFFont {
+  if (hebrew) return bold ? fonts.hebrewBold : fonts.hebrew;
+  return bold ? fonts.latinBold : fonts.latin;
+}
+
+function widthOfMixedText(str: string, fonts: FontSet, size: number, bold: boolean): number {
+  let w = 0;
+  for (const run of splitScriptRuns(str)) {
+    w += fontFor(fonts, run.hebrew, bold).widthOfTextAtSize(run.text, size);
+  }
+  return w;
+}
+
 interface Token { text: string; bold: boolean }
 
 /** Splits "some **bold** text" into alternating plain/bold tokens (words, spaces preserved as separators). */
@@ -88,7 +135,7 @@ function tokenize(line: string): Token[] {
 }
 
 /** Wraps a token stream into visual lines of {text, bold} words, each fitting within maxW. */
-function wrapTokens(tokens: Token[], font: PDFFont, bold: PDFFont, size: number, maxW: number): Token[][] {
+function wrapTokens(tokens: Token[], fonts: FontSet, size: number, maxW: number): Token[][] {
   const words: Token[] = [];
   for (const tok of tokens) {
     const parts = tok.text.split(/(\s+)/).filter((s) => s.length);
@@ -99,8 +146,7 @@ function wrapTokens(tokens: Token[], font: PDFFont, bold: PDFFont, size: number,
   let curW = 0;
   for (const word of words) {
     if (/^\s+$/.test(word.text) && cur.length === 0) continue; // skip leading spaces on a new line
-    const f = word.bold ? bold : font;
-    const w = f.widthOfTextAtSize(word.text, size);
+    const w = widthOfMixedText(word.text, fonts, size, word.bold);
     if (curW + w > maxW && cur.length) {
       // trim trailing space token before breaking
       while (cur.length && /^\s+$/.test(cur[cur.length - 1].text)) cur.pop();
@@ -122,15 +168,29 @@ function wrapTokens(tokens: Token[], font: PDFFont, bold: PDFFont, size: number,
 class Writer {
   doc!: PDFDocument;
   page!: PDFPage;
-  font!: PDFFont;
-  bold!: PDFFont;
+  fonts!: FontSet;
   y = PAGE_H - MARGIN;
 
   async init() {
     this.doc = await PDFDocument.create();
-    this.font = await this.doc.embedFont(StandardFonts.Helvetica);
-    this.bold = await this.doc.embedFont(StandardFonts.HelveticaBold);
+    this.doc.registerFontkit(fontkit);
+    const [latinReg, latinBold, hebReg, hebBold] = await Promise.all([
+      fetch("/fonts/NotoSans-Regular.ttf").then((r) => r.arrayBuffer()),
+      fetch("/fonts/NotoSans-Bold.ttf").then((r) => r.arrayBuffer()),
+      fetch("/fonts/NotoSansHebrew-Regular.ttf").then((r) => r.arrayBuffer()),
+      fetch("/fonts/NotoSansHebrew-Bold.ttf").then((r) => r.arrayBuffer()),
+    ]);
+    this.fonts = {
+      latin: await this.doc.embedFont(latinReg),
+      latinBold: await this.doc.embedFont(latinBold),
+      hebrew: await this.doc.embedFont(hebReg),
+      hebrewBold: await this.doc.embedFont(hebBold),
+    };
     this.newPage();
+  }
+
+  widthOfText(str: string, size: number, bold = false): number {
+    return widthOfMixedText(str, this.fonts, size, bold);
   }
 
   /** Draws a PNG image scaled to fit within maxW x maxH, anchored top-left at (x, topY), preserving aspect ratio. */
@@ -151,15 +211,20 @@ class Writer {
     if (this.y - h < MARGIN + 60) this.newPage();
   }
 
-  text(str: string, x: number, size: number, opts: { font?: PDFFont; color?: RGB } = {}) {
-    this.page.drawText(str, { x, y: this.y, size, font: opts.font ?? this.font, color: opts.color ?? INK });
+  /** Draws text left-to-right starting at x, splitting into per-script runs so any Unicode text renders correctly. */
+  text(str: string, x: number, size: number, opts: { bold?: boolean; color?: RGB } = {}) {
+    let cx = x;
+    for (const run of splitScriptRuns(str)) {
+      const font = fontFor(this.fonts, run.hebrew, opts.bold ?? false);
+      this.page.drawText(run.text, { x: cx, y: this.y, size, font, color: opts.color ?? INK });
+      cx += font.widthOfTextAtSize(run.text, size);
+    }
   }
 
   /** Draw text right-aligned so it never overflows past `rightX`. */
-  textRight(str: string, rightX: number, size: number, opts: { font?: PDFFont; color?: RGB } = {}) {
-    const font = opts.font ?? this.font;
-    const w = font.widthOfTextAtSize(str, size);
-    this.page.drawText(str, { x: rightX - w, y: this.y, size, font, color: opts.color ?? INK });
+  textRight(str: string, rightX: number, size: number, opts: { bold?: boolean; color?: RGB } = {}) {
+    const w = widthOfMixedText(str, this.fonts, size, opts.bold ?? false);
+    this.text(str, rightX - w, size, opts);
   }
 
   rect(x: number, y: number, w: number, h: number, color: RGB) {
@@ -174,9 +239,11 @@ class Writer {
   drawTokenLine(tokens: Token[], x: number, size: number, color: RGB) {
     let cx = x;
     for (const tok of tokens) {
-      const f = tok.bold ? this.bold : this.font;
-      this.page.drawText(tok.text, { x: cx, y: this.y, size, font: f, color });
-      cx += f.widthOfTextAtSize(tok.text, size);
+      for (const run of splitScriptRuns(tok.text)) {
+        const font = fontFor(this.fonts, run.hebrew, tok.bold);
+        this.page.drawText(run.text, { x: cx, y: this.y, size, font, color });
+        cx += font.widthOfTextAtSize(run.text, size);
+      }
     }
   }
 }
@@ -204,7 +271,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
   w.y = PAGE_H - 50;
   if (!logoDrawn) {
-    w.text(data.clinicName.toUpperCase(), MARGIN, 28, { font: w.bold, color: WHITE });
+    w.text(data.clinicName.toUpperCase(), MARGIN, 28, { bold: true, color: WHITE });
   }
   w.y -= 24;
   const subParts = [data.clinicAddress, data.clinicPhone, data.clinicEmail].filter(Boolean);
@@ -212,20 +279,20 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
     w.text(subParts.join("   ·   "), MARGIN, 11.5, { color: rgb(0.85, 0.85, 0.85) });
   }
   w.y = PAGE_H - 50;
-  w.textRight(t.quote, PAGE_W - MARGIN, 24, { font: w.bold, color: GOLD });
+  w.textRight(t.quote, PAGE_W - MARGIN, 24, { bold: true, color: GOLD });
 
   w.y = PAGE_H - HEADER_H - 36;
 
   // ── Patient / Date / Valid-until block ──
   const colDateX = PAGE_W / 2;
   const colValidX = PAGE_W - MARGIN - 150;
-  w.text(t.patient, MARGIN, 11, { font: w.bold, color: MUTED });
-  w.text(t.date, colDateX, 11, { font: w.bold, color: MUTED });
-  if (data.validUntil) w.text(t.validUntil, colValidX, 11, { font: w.bold, color: MUTED });
+  w.text(t.patient, MARGIN, 11, { bold: true, color: MUTED });
+  w.text(t.date, colDateX, 11, { bold: true, color: MUTED });
+  if (data.validUntil) w.text(t.validUntil, colValidX, 11, { bold: true, color: MUTED });
   w.y -= 21;
-  w.text(data.patientName, MARGIN, 18.5, { font: w.bold });
-  w.text(data.date, colDateX, 18.5, { font: w.bold });
-  if (data.validUntil) w.text(data.validUntil, colValidX, 18.5, { font: w.bold, color: GOLD });
+  w.text(data.patientName, MARGIN, 18.5, { bold: true });
+  w.text(data.date, colDateX, 18.5, { bold: true });
+  if (data.validUntil) w.text(data.validUntil, colValidX, 18.5, { bold: true, color: GOLD });
   w.y -= 24;
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, GOLD, 1.4);
   w.y -= 26;
@@ -249,11 +316,11 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
   const drawTableHeader = () => {
     w.rect(MARGIN, w.y - 11, contentW, 40, NAVY);
-    w.text(t.service, colService + 8, 15.5, { font: w.bold, color: WHITE });
-    w.textRight(t.qty, colQtyRight, 15.5, { font: w.bold, color: WHITE });
-    w.textRight(t.price, colUnitRight, 15.5, { font: w.bold, color: WHITE });
-    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, 15.5, { font: w.bold, color: WHITE });
-    w.textRight(t.total, colTotalRight, 15.5, { font: w.bold, color: WHITE });
+    w.text(t.service, colService + 8, 15.5, { bold: true, color: WHITE });
+    w.textRight(t.qty, colQtyRight, 15.5, { bold: true, color: WHITE });
+    w.textRight(t.price, colUnitRight, 15.5, { bold: true, color: WHITE });
+    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, 15.5, { bold: true, color: WHITE });
+    w.textRight(t.total, colTotalRight, 15.5, { bold: true, color: WHITE });
     w.y -= 40;
   };
 
@@ -262,7 +329,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
     const bandH = 40;
     w.rect(MARGIN, w.y - bandH, contentW, bandH, NAVY);
     w.y -= bandH - 13;
-    w.text(label.toUpperCase(), colService + 8, 14, { font: w.bold, color: WHITE });
+    w.text(label.toUpperCase(), colService + 8, 14, { bold: true, color: WHITE });
     w.y -= 13;
   };
 
@@ -295,7 +362,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
       let cur = "";
       for (const word of words) {
         const candidate = cur ? `${cur} ${word}` : word;
-        if (w.font.widthOfTextAtSize(candidate, ROW_FONT) <= maxServiceW) cur = candidate;
+        if (w.widthOfText(candidate, ROW_FONT) <= maxServiceW) cur = candidate;
         else { if (cur) serviceLines.push(cur); cur = word; }
       }
       if (cur) serviceLines.push(cur);
@@ -321,7 +388,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
       w.textRight(it.qty || "1", colQtyRight, ROW_FONT);
       w.textRight(money(it.unit_price, currency), colUnitRight, ROW_FONT);
       if (discLabel) w.textRight(discLabel, colDiscountRight, ROW_FONT, { color: GOLD });
-      w.textRight(money(rowTotal, currency), colTotalRight, ROW_FONT, { font: w.bold });
+      w.textRight(money(rowTotal, currency), colTotalRight, ROW_FONT, { bold: true });
 
       // remaining wrapped lines, each on its own line beneath the first
       for (let i = 1; i < serviceLines.length; i++) {
@@ -347,15 +414,15 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   const totalBoxX = MARGIN + contentW - totalBoxW;
   w.rect(totalBoxX, totalBoxTop - totalBoxH, totalBoxW, totalBoxH, NAVY);
   w.y = totalBoxTop - totalBoxH / 2 - 7; // vertically center the label/value in the box
-  w.text(t.total, totalBoxX + 18, 13, { font: w.bold, color: WHITE });
-  w.textRight(money(grandTotal, currency), colTotalRight - 14, 22, { font: w.bold, color: WHITE });
+  w.text(t.total, totalBoxX + 18, 13, { bold: true, color: WHITE });
+  w.textRight(money(grandTotal, currency), colTotalRight - 14, 22, { bold: true, color: WHITE });
   w.y = totalBoxTop - totalBoxH - 18;
 
   if (data.notes && data.notes.trim()) {
     w.ensureSpace(50);
-    w.text(t.notes, MARGIN, 11.5, { font: w.bold, color: MUTED });
+    w.text(t.notes, MARGIN, 11.5, { bold: true, color: MUTED });
     w.y -= 19;
-    const noteLines = wrapText(data.notes, w.font, 12.5, contentW);
+    const noteLines = wrapText(data.notes, w.fonts, 12.5, contentW);
     for (const line of noteLines) {
       w.ensureSpace(18);
       w.text(line, MARGIN, 12.5);
@@ -377,14 +444,14 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   /** Renders **bold**-marked, optionally "- "-bulleted paragraph lines under a gold title. */
   const footerSection = (title: string, lines: string[]) => {
     w.ensureSpace(26 + lines.length * LEADING);
-    w.text(title.toUpperCase(), MARGIN, 15.5, { font: w.bold, color: NAVY });
+    w.text(title.toUpperCase(), MARGIN, 15.5, { bold: true, color: NAVY });
     w.y -= 25;
     for (const raw of lines) {
       const isBullet = raw.startsWith("- ");
       const line = isBullet ? raw.slice(2) : raw;
       const x = isBullet ? MARGIN + BULLET_INDENT : MARGIN;
       const maxW = contentW - (isBullet ? BULLET_INDENT : 0);
-      const wrapped = wrapTokens(tokenize(line), w.font, w.bold, SIZE, maxW);
+      const wrapped = wrapTokens(tokenize(line), w.fonts, SIZE, maxW);
       wrapped.forEach((tl, i) => {
         w.ensureSpace(20);
         if (isBullet && i === 0) w.text("•", MARGIN, SIZE, { color: INK });
@@ -408,7 +475,7 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   if (infoLines.length) {
     w.ensureSpace(16 + infoLines.length * 22);
     for (const line of infoLines) {
-      w.text(line, MARGIN, 15, { font: w.bold, color: INK });
+      w.text(line, MARGIN, 15, { bold: true, color: INK });
       w.y -= 22;
     }
     w.y -= 6;
@@ -417,13 +484,13 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   return w.doc.save();
 }
 
-function wrapText(text: string, font: PDFFont, size: number, maxW: number): string[] {
+function wrapText(text: string, fonts: FontSet, size: number, maxW: number): string[] {
   const words = text.split(/\s+/);
   const lines: string[] = [];
   let cur = "";
   for (const word of words) {
     const candidate = cur ? `${cur} ${word}` : word;
-    if (font.widthOfTextAtSize(candidate, size) <= maxW) cur = candidate;
+    if (widthOfMixedText(candidate, fonts, size, false) <= maxW) cur = candidate;
     else { if (cur) lines.push(cur); cur = word; }
   }
   if (cur) lines.push(cur);
