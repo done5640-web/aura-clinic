@@ -1,6 +1,7 @@
 import { PDFDocument, PDFFont, PDFPage, rgb, RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { PreventivLang, PREVENTIV_STRINGS } from "./preventivTranslations";
+import { PreventivLang, PREVENTIV_STRINGS, PreventivStrings } from "./preventivTranslations";
+import { UPPER_TEETH, LOWER_TEETH, TOOTH_PATH, TOOTH_VIEWBOX } from "./toothChart";
 
 export interface QuoteItem {
   section: string;
@@ -35,6 +36,7 @@ export interface PreventivData {
   emailLine?: string | null;
   websiteLine?: string | null;
   servicesChecklist?: ChecklistItem[];
+  selectedTeeth?: number[];
 }
 
 /** Computes the discounted total for an item. Falls back to the raw `total` field when no discount is enabled. */
@@ -297,22 +299,39 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   w.lineH(MARGIN, PAGE_W - MARGIN, w.y, GOLD, 1.4);
   w.y -= 26;
 
-  const hasDiscounts = data.items.some((it) => it.discountEnabled && it.discountValue);
+  if (data.selectedTeeth && data.selectedTeeth.length) {
+    drawToothChart(w, data.selectedTeeth, t, contentW);
+  }
 
-  // ── Table columns ── built right-to-left so each numeric column gets just
-  // enough room for its widest realistic value at large-print size, and the
-  // service name keeps whatever space is left.
+  const hasDiscounts = data.items.some((it) => it.discountEnabled && it.discountValue);
+  const ROW_FONT = 20;
+  const MIN_ROW_FONT = 12;
+
+  /** A font size <= baseSize that keeps `str` within maxW — shrinks only for outlier-long
+   *  values (e.g. an unusually large price), so columns never overlap regardless of magnitude. */
+  const fitFontSize = (str: string, maxW: number, baseSize: number, bold = false): number => {
+    const naturalW = w.widthOfText(str, baseSize, bold);
+    if (naturalW <= maxW) return baseSize;
+    return Math.max(MIN_ROW_FONT, baseSize * (maxW / naturalW));
+  };
+
+  // ── Table columns ── built right-to-left with generous fixed widths that comfortably
+  // fit realistic clinic amounts (up to 6-figure totals) at large-print size; widened
+  // further if a header label needs more room, and any outlier value that still doesn't
+  // fit gets its own font shrunk (via fitFontSize below) rather than overlapping.
+  const COL_PAD = 14;
+  const qtyW = Math.max(50, w.widthOfText(t.qty, 15.5, true) + COL_PAD);
+  const priceW = Math.max(120, w.widthOfText(t.price, 15.5, true) + COL_PAD);
+  const discountW = hasDiscounts ? Math.max(105, w.widthOfText(t.discount, 15.5, true) + COL_PAD) : 0;
+  const totalW = Math.max(135, w.widthOfText(t.total, 15.5, true) + COL_PAD);
+
   const TABLE_RIGHT_PAD = 10;
   const colService = MARGIN;
   const colTotalRight = MARGIN + contentW - TABLE_RIGHT_PAD;
-  const TOTAL_W = 105;
-  const colDiscountRight = colTotalRight - TOTAL_W;
-  const DISCOUNT_W = 85;
-  const colUnitRight = hasDiscounts ? colDiscountRight - DISCOUNT_W : colTotalRight - TOTAL_W;
-  const PRICE_W = 100;
-  const colQtyRight = colUnitRight - PRICE_W;
-  const QTY_W = 30;
-  const colServiceMaxX = colQtyRight - QTY_W;
+  const colDiscountRight = colTotalRight - totalW;
+  const colUnitRight = hasDiscounts ? colDiscountRight - discountW : colTotalRight - totalW;
+  const colQtyRight = colUnitRight - priceW;
+  const colServiceMaxX = colQtyRight - qtyW;
 
   const drawTableHeader = () => {
     w.rect(MARGIN, w.y - 11, contentW, 40, NAVY);
@@ -347,7 +366,6 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
   let grandTotal = 0;
   let zebraIdx = 0;
-  const ROW_FONT = 20;
   const LINE_GAP = 27;       // gap between wrapped lines within a cell
   const ROW_VPAD = 17;       // vertical padding above + below text block, each side
   const ZEBRA_BG = rgb(0.965, 0.955, 0.935);
@@ -362,8 +380,18 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
       let cur = "";
       for (const word of words) {
         const candidate = cur ? `${cur} ${word}` : word;
-        if (w.widthOfText(candidate, ROW_FONT) <= maxServiceW) cur = candidate;
-        else { if (cur) serviceLines.push(cur); cur = word; }
+        if (w.widthOfText(candidate, ROW_FONT) <= maxServiceW) { cur = candidate; continue; }
+        if (cur) { serviceLines.push(cur); cur = ""; }
+        if (w.widthOfText(word, ROW_FONT) <= maxServiceW) { cur = word; continue; }
+        // a single word wider than the whole column (e.g. no spaces) — break by character
+        // instead of overflowing into the QTY column next to it
+        let chunk = "";
+        for (const ch of word) {
+          const candidateChunk = chunk + ch;
+          if (!chunk || w.widthOfText(candidateChunk, ROW_FONT) <= maxServiceW) chunk = candidateChunk;
+          else { serviceLines.push(chunk); chunk = ch; }
+        }
+        cur = chunk;
       }
       if (cur) serviceLines.push(cur);
       if (serviceLines.length === 0) serviceLines.push(it.service);
@@ -382,13 +410,18 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
       const rowTotal = discountedTotal(it);
       const discLabel = discountLabel(it, currency);
+      const qtyStr = it.qty || "1";
+      const priceStr = money(it.unit_price, currency);
+      const totalStr = money(rowTotal, currency);
 
       w.y = firstBaselineY;
       w.text(serviceLines[0], colService + 8, ROW_FONT);
-      w.textRight(it.qty || "1", colQtyRight, ROW_FONT);
-      w.textRight(money(it.unit_price, currency), colUnitRight, ROW_FONT);
-      if (discLabel) w.textRight(discLabel, colDiscountRight, ROW_FONT, { color: GOLD });
-      w.textRight(money(rowTotal, currency), colTotalRight, ROW_FONT, { bold: true });
+      w.textRight(qtyStr, colQtyRight, fitFontSize(qtyStr, qtyW - COL_PAD, ROW_FONT));
+      w.textRight(priceStr, colUnitRight, fitFontSize(priceStr, priceW - COL_PAD, ROW_FONT));
+      if (discLabel) {
+        w.textRight(discLabel, colDiscountRight, fitFontSize(discLabel, discountW - COL_PAD, ROW_FONT), { color: GOLD });
+      }
+      w.textRight(totalStr, colTotalRight, fitFontSize(totalStr, totalW - COL_PAD, ROW_FONT, true), { bold: true });
 
       // remaining wrapped lines, each on its own line beneath the first
       for (let i = 1; i < serviceLines.length; i++) {
@@ -415,7 +448,9 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   w.rect(totalBoxX, totalBoxTop - totalBoxH, totalBoxW, totalBoxH, NAVY);
   w.y = totalBoxTop - totalBoxH / 2 - 7; // vertically center the label/value in the box
   w.text(t.total, totalBoxX + 18, 13, { bold: true, color: WHITE });
-  w.textRight(money(grandTotal, currency), colTotalRight - 14, 22, { bold: true, color: WHITE });
+  const grandTotalStr = money(grandTotal, currency);
+  const grandTotalMaxW = totalBoxW - 130; // leave room for the "TOTAL" label on the left
+  w.textRight(grandTotalStr, colTotalRight - 14, fitFontSize(grandTotalStr, grandTotalMaxW, 22, true), { bold: true, color: WHITE });
   w.y = totalBoxTop - totalBoxH - 18;
 
   if (data.notes && data.notes.trim()) {
@@ -481,7 +516,180 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
     w.y -= 6;
   }
 
+  // ── Reserve-your-treatment deposit box, always the very last thing on the PDF ──
+  drawReservePromo(w, t, currency, contentW);
+
   return w.doc.save();
+}
+
+/** Draws the FDI upper/lower tooth chart with the selected teeth highlighted in gold. */
+function drawToothChart(w: Writer, selectedTeeth: number[], t: PreventivStrings, contentW: number) {
+  const GAP = 6;
+  const MID_GAP = 14;
+  const LABEL_SIZE = 8;
+  const LABEL_GAP = 4;
+  const slotW = (contentW - GAP * 14 - MID_GAP) / 16;
+  const iconW = slotW * 0.62;
+  const scale = iconW / TOOTH_VIEWBOX.width;
+  const iconH = TOOTH_VIEWBOX.height * scale;
+  const rowH = iconH + LABEL_GAP + LABEL_SIZE;
+  const rowGap = 14;
+
+  const SELECTED_STROKE = rgb(0.55, 0.4, 0.03);
+  const UNSELECTED_FILL = rgb(0.98, 0.98, 0.98);
+
+  w.ensureSpace(15 + 20 + rowH * 2 + rowGap + 34);
+  w.text(t.selectedTeethTitle.toUpperCase(), MARGIN, 13, { bold: true, color: NAVY });
+  w.y -= 20;
+
+  const drawRow = (row: number[]) => {
+    const topY = w.y;
+    let x = MARGIN;
+    for (let idx = 0; idx < row.length; idx++) {
+      if (idx === 8) x += MID_GAP;
+      const tooth = row[idx];
+      const selected = selectedTeeth.includes(tooth);
+      const slotCenterX = x + slotW / 2;
+      w.page.drawSvgPath(TOOTH_PATH, {
+        x: slotCenterX - iconW / 2,
+        y: topY,
+        scale,
+        color: selected ? GOLD : UNSELECTED_FILL,
+        borderColor: selected ? SELECTED_STROKE : LINE,
+        borderWidth: 1,
+      });
+      const label = String(tooth);
+      const font = w.fonts.latinBold;
+      const tw = font.widthOfTextAtSize(label, LABEL_SIZE);
+      w.page.drawText(label, {
+        x: slotCenterX - tw / 2,
+        y: topY - iconH - LABEL_GAP - LABEL_SIZE * 0.75,
+        size: LABEL_SIZE,
+        font,
+        color: selected ? SELECTED_STROKE : MUTED,
+      });
+      x += slotW + GAP;
+    }
+    w.y = topY - rowH;
+  };
+
+  drawRow(UPPER_TEETH);
+  w.y -= rowGap;
+  drawRow(LOWER_TEETH);
+  // drawTableHeader's navy band extends ~29pt above the y it's called at (it straddles
+  // the header text's baseline), so leave more than that here or the band clips the chart.
+  w.y -= 34;
+}
+
+/** Draws the "reserve your treatment / secure a deposit" promo box at the bottom of the PDF. */
+function drawReservePromo(w: Writer, t: PreventivStrings, currency: string, contentW: number) {
+  const DEPOSIT_AMOUNT = 100;
+  const DEPOSIT_DEDUCT = 50;
+  const PAD = 16;
+  const COL_GAP = 18;
+  const RIGHT_W = 160;
+  const leftW = contentW - PAD * 2 - COL_GAP - RIGHT_W;
+
+  const BODY_SIZE = 11;
+  const LEAD = 15.5;
+  const AMBER_SIZE = 10.5;
+  const AMBER_LEAD = 14;
+
+  const bullets = t.depositBullets.map((b) => b.replace("{amount}", money(DEPOSIT_DEDUCT, currency)));
+  const bulletWrapped = bullets.map((b) => wrapTokens(tokenize(b), w.fonts, BODY_SIZE, leftW - 14));
+  const amberLines = wrapTokens(tokenize(`**${t.limitedTimeLabel}** ${t.limitedTimeText}`), w.fonts, AMBER_SIZE, contentW - PAD * 2 - 20);
+  const confirmLines = wrapTokens(tokenize(t.reserveConfirm), w.fonts, AMBER_SIZE, contentW - PAD * 2 - 20);
+
+  const AMBER_BORDER = rgb(0.87, 0.62, 0.18);
+  const AMBER_BG = rgb(1, 0.96, 0.87);
+  const AMBER_TEXT = rgb(0.5, 0.32, 0.04);
+  const GREEN_BG = rgb(0.902, 0.957, 0.918);
+  const GREEN = rgb(0.114, 0.478, 0.298);
+  const BOX_BG = rgb(0.965, 0.972, 0.984);
+  const BOX_BORDER = rgb(0.78, 0.84, 0.92);
+
+  // ── measure every section's height up front, from the same numbers used to draw it ──
+  const headerH = 14 + 18 + 14 + 18; // title offset + gap + subtitle gap + divider gap
+  const leftColH = 20 + bulletWrapped.reduce((sum, lines) => sum + lines.length * LEAD + 5, 0);
+  const rightColH = 18 + 26 + 18 + t.paymentMethods.length * 15 + 10;
+  const bodyH = Math.max(leftColH, rightColH);
+  const amberInnerH = amberLines.length * AMBER_LEAD + 6 + confirmLines.length * AMBER_LEAD;
+  const amberBoxH = 20 + amberInnerH;
+  const totalH = PAD + headerH + bodyH + 16 + amberBoxH + PAD;
+
+  w.ensureSpace(totalH + 10);
+  const boxTop = w.y;
+  const boxX = MARGIN;
+
+  w.page.drawRectangle({
+    x: boxX, y: boxTop - totalH, width: contentW, height: totalH,
+    color: BOX_BG, borderColor: BOX_BORDER, borderWidth: 1,
+  });
+
+  // ── header ──
+  w.y = boxTop - PAD - 14;
+  const titleW = w.widthOfText(t.reserveTitle, 15, true);
+  w.text(t.reserveTitle, boxX + (contentW - titleW) / 2, 15, { bold: true, color: NAVY });
+  w.y -= 18;
+  const subW = w.widthOfText(t.reserveSubtitle, 10.5);
+  w.text(t.reserveSubtitle, boxX + (contentW - subW) / 2, 10.5, { color: MUTED });
+  w.y -= 14;
+  w.lineH(boxX + PAD, boxX + contentW - PAD, w.y, LINE, 0.75);
+  w.y -= 18;
+
+  // ── left column: deposit bullet list ──
+  const colTop = w.y;
+  const leftX = boxX + PAD;
+  w.text(t.depositIntro, leftX, BODY_SIZE, { bold: true, color: INK });
+  w.y -= 20;
+  for (const lines of bulletWrapped) {
+    lines.forEach((line, i) => {
+      if (i === 0) w.text("•", leftX, BODY_SIZE, { color: GOLD });
+      w.drawTokenLine(line, leftX + 12, BODY_SIZE, INK);
+      w.y -= LEAD;
+    });
+    w.y -= 5;
+  }
+
+  // ── right column: green deposit-amount box ──
+  const rightX = leftX + leftW + COL_GAP;
+  const rightTop = colTop;
+  w.page.drawRectangle({
+    x: rightX, y: rightTop - rightColH, width: RIGHT_W, height: rightColH,
+    color: GREEN_BG, borderColor: GREEN, borderWidth: 1,
+  });
+  w.y = rightTop - 18;
+  const labelW = w.widthOfText(t.depositAmountLabel.toUpperCase(), 9.5, true);
+  w.text(t.depositAmountLabel.toUpperCase(), rightX + (RIGHT_W - labelW) / 2, 9.5, { bold: true, color: GREEN });
+  w.y -= 26;
+  const amountStr = money(DEPOSIT_AMOUNT, currency);
+  const amountW = w.widthOfText(amountStr, 22, true);
+  w.text(amountStr, rightX + (RIGHT_W - amountW) / 2, 22, { bold: true, color: GREEN });
+  w.y -= 18;
+  for (const method of t.paymentMethods) {
+    const mW = w.widthOfText(method, 9.5);
+    w.text(method, rightX + (RIGHT_W - mW) / 2, 9.5, { color: rgb(0.2, 0.35, 0.27) });
+    w.y -= 15;
+  }
+
+  // ── amber "limited time" notice, full width, below both columns ──
+  const amberTop = colTop - bodyH - 16;
+  w.page.drawRectangle({
+    x: leftX, y: amberTop - amberBoxH, width: contentW - PAD * 2, height: amberBoxH,
+    color: AMBER_BG, borderColor: AMBER_BORDER, borderWidth: 1,
+  });
+  w.y = amberTop - 14;
+  for (const line of amberLines) {
+    w.drawTokenLine(line, leftX + 10, AMBER_SIZE, AMBER_TEXT);
+    w.y -= AMBER_LEAD;
+  }
+  w.y -= 6;
+  for (const line of confirmLines) {
+    w.drawTokenLine(line, leftX + 10, AMBER_SIZE, AMBER_TEXT);
+    w.y -= AMBER_LEAD;
+  }
+
+  w.y = boxTop - totalH - 10;
 }
 
 function wrapText(text: string, fonts: FontSet, size: number, maxW: number): string[] {

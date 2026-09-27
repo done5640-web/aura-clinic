@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ToothChart from "@/components/ToothChart";
 import {
   ArrowLeft, Plus, Trash2, Download, Save, FileText, GripVertical, Sparkles, Languages, Percent,
   CalendarIcon, X,
@@ -91,6 +92,7 @@ export default function PreventivEditor() {
   const [emailLine, setEmailLine] = useState(DEFAULT_EMAIL_LINE);
   const [websiteLine, setWebsiteLine] = useState(DEFAULT_WEBSITE_LINE);
   const [servicesChecklist, setServicesChecklist] = useState<ChecklistItem[]>(defaultServicesChecklist());
+  const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [pastQuotes, setPastQuotes] = useState<any[]>([]);
@@ -126,6 +128,7 @@ export default function PreventivEditor() {
           setServicesChecklist(
             (existing.services_checklist as ChecklistItem[] | null) ?? defaultServicesChecklist()
           );
+          setSelectedTeeth((existing.selected_teeth as number[] | null) ?? []);
         }
       } else {
         setRows(defaultRows());
@@ -187,6 +190,28 @@ export default function PreventivEditor() {
     setServicesChecklist((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const toothSectionName = (tooth: number) => `Dhëmbi ${tooth}`;
+
+  /** Clicking a tooth both highlights it on the chart and scaffolds a section in the items
+   *  table below (one empty row) so issues + prices can be added for that tooth. Unclicking
+   *  it removes that section again — but only while it's still empty, so filled-in data is
+   *  never silently discarded. */
+  const toggleTooth = (tooth: number) => {
+    const isSelected = selectedTeeth.includes(tooth);
+    const sectionName = toothSectionName(tooth);
+    if (isSelected) {
+      setSelectedTeeth((prev) => prev.filter((t) => t !== tooth));
+      setRows((prev) => {
+        const sectionRows = prev.filter((r) => r.section === sectionName);
+        const hasData = sectionRows.some((r) => r.service.trim() || r.unit_price.trim());
+        return hasData ? prev : prev.filter((r) => r.section !== sectionName);
+      });
+    } else {
+      setSelectedTeeth((prev) => [...prev, tooth]);
+      setRows((prev) => (prev.some((r) => r.section === sectionName) ? prev : [...prev, emptyRow(sectionName)]));
+    }
+  };
+
   const fmtDDMMYYYY = (d: Date) => {
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -225,6 +250,7 @@ export default function PreventivEditor() {
     emailLine,
     websiteLine,
     servicesChecklist,
+    selectedTeeth,
   });
 
   const openLanguagePicker = () => {
@@ -244,6 +270,7 @@ export default function PreventivEditor() {
       email_line: emailLine || DEFAULT_EMAIL_LINE,
       website_line: websiteLine || DEFAULT_WEBSITE_LINE,
       services_checklist: servicesChecklist,
+      selected_teeth: selectedTeeth,
     };
     let error;
     if (quoteId) {
@@ -419,6 +446,13 @@ export default function PreventivEditor() {
                 />
               </PopoverContent>
             </Popover>
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Dhëmbët e trajtuar — kliko një dhëmb për t'i shtuar çështje (shfaqet në PDF)</Label>
+          <div className="mt-1">
+            <ToothChart selected={selectedTeeth} onToggle={toggleTooth} />
           </div>
         </div>
 

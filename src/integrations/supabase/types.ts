@@ -413,6 +413,7 @@ export type Database = {
           items: Json
           lead_id: string
           notes: string | null
+          selected_teeth: Json
           services_checklist: Json | null
           title: string
           total: number
@@ -431,6 +432,7 @@ export type Database = {
           items?: Json
           lead_id: string
           notes?: string | null
+          selected_teeth?: Json
           services_checklist?: Json | null
           title?: string
           total?: number
@@ -449,6 +451,7 @@ export type Database = {
           items?: Json
           lead_id?: string
           notes?: string | null
+          selected_teeth?: Json
           services_checklist?: Json | null
           title?: string
           total?: number

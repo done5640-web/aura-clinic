@@ -20,6 +20,16 @@ export interface PreventivStrings {
   defaultSectionName: string;
   upperJaw: string;
   lowerJaw: string;
+  selectedTeethTitle: string;
+  reserveTitle: string;
+  reserveSubtitle: string;
+  depositIntro: string;
+  depositBullets: string[]; // last entry uses "{amount}" as a placeholder for the deducted amount
+  depositAmountLabel: string;
+  paymentMethods: string[];
+  limitedTimeLabel: string;
+  limitedTimeText: string;
+  reserveConfirm: string;
 }
 
 export const PREVENTIV_STRINGS: Record<PreventivLang, PreventivStrings> = {
@@ -63,6 +73,21 @@ export const PREVENTIV_STRINGS: Record<PreventivLang, PreventivStrings> = {
     defaultSectionName: "Services",
     upperJaw: "Upper Jaw",
     lowerJaw: "Lower Jaw",
+    selectedTeethTitle: "Selected Teeth",
+    reserveTitle: "Reserve Your Treatment Today!",
+    reserveSubtitle: "Secure your prices with a small deposit",
+    depositIntro: "Make a deposit to:",
+    depositBullets: [
+      "Lock in these exact prices",
+      "Schedule treatment at your convenience",
+      "Arrange Airport Pick-up",
+      "**{amount}** will be deducted from the final payment",
+    ],
+    depositAmountLabel: "Deposit Amount",
+    paymentMethods: ["Credit Card", "Debit Card", "Bank Transfer"],
+    limitedTimeLabel: "Limited Time Offer:",
+    limitedTimeText: "This discount is only valid for reservations made within 48 hours.",
+    reserveConfirm: "Reserve now and come for treatment anytime - your prices are locked!",
   },
   it: {
     quote: "PREVENTIVO",
@@ -104,6 +129,21 @@ export const PREVENTIV_STRINGS: Record<PreventivLang, PreventivStrings> = {
     defaultSectionName: "Servizi",
     upperJaw: "Arcata Superiore",
     lowerJaw: "Arcata Inferiore",
+    selectedTeethTitle: "Denti Selezionati",
+    reserveTitle: "Prenota il Tuo Trattamento Oggi!",
+    reserveSubtitle: "Blocca i tuoi prezzi con un piccolo acconto",
+    depositIntro: "Versa un acconto per:",
+    depositBullets: [
+      "Bloccare questi prezzi esatti",
+      "Programmare il trattamento quando preferisci",
+      "Organizzare il transfer dall'aeroporto",
+      "**{amount}** verranno detratti dal pagamento finale",
+    ],
+    depositAmountLabel: "Importo Acconto",
+    paymentMethods: ["Carta di Credito", "Carta di Debito", "Bonifico Bancario"],
+    limitedTimeLabel: "Offerta a Tempo Limitato:",
+    limitedTimeText: "Questo sconto è valido solo per le prenotazioni effettuate entro 48 ore.",
+    reserveConfirm: "Prenota ora e vieni per il trattamento quando vuoi - i tuoi prezzi sono bloccati!",
   },
   fr: {
     quote: "DEVIS",
@@ -145,5 +185,20 @@ export const PREVENTIV_STRINGS: Record<PreventivLang, PreventivStrings> = {
     defaultSectionName: "Services",
     upperJaw: "Arcade Supérieure",
     lowerJaw: "Arcade Inférieure",
+    selectedTeethTitle: "Dents Sélectionnées",
+    reserveTitle: "Réservez Votre Traitement Dès Aujourd'hui !",
+    reserveSubtitle: "Sécurisez vos tarifs avec un petit acompte",
+    depositIntro: "Versez un acompte pour :",
+    depositBullets: [
+      "Verrouiller ces tarifs exacts",
+      "Planifier le traitement à votre convenance",
+      "Organiser le transfert depuis l'aéroport",
+      "**{amount}** seront déduits du paiement final",
+    ],
+    depositAmountLabel: "Montant de l'Acompte",
+    paymentMethods: ["Carte de Crédit", "Carte de Débit", "Virement Bancaire"],
+    limitedTimeLabel: "Offre à Durée Limitée :",
+    limitedTimeText: "Cette réduction n'est valable que pour les réservations effectuées dans les 48 heures.",
+    reserveConfirm: "Réservez maintenant et venez pour le traitement quand vous voulez - vos tarifs sont verrouillés !",
   },
 };

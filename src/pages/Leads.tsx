@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import SearchableSelect from "@/components/SearchableSelect";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Search, Inbox, Upload, Trash2, CheckSquare, X, ChevronDown, History, CalendarDays, Clock, Filter } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -83,6 +84,7 @@ export default function Leads() {
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
   const [openSheet, setOpenSheet] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [confirmLead, setConfirmLead] = useState<Lead | null>(null);
@@ -96,6 +98,7 @@ export default function Leads() {
   const [createdFrom, setCreatedFrom] = useState<string>("");
   const [createdTo, setCreatedTo] = useState<string>("");
   const [createdRangeOpen, setCreatedRangeOpen] = useState(false);
+  const [createdBarFilterOpen, setCreatedBarFilterOpen] = useState(false);
 
   // History modal state
   const [historyLead, setHistoryLead] = useState<Lead | null>(null);
@@ -196,7 +199,7 @@ export default function Leads() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  useEffect(() => { setPage(1); }, [stageFilter, assigneeFilter, sourceFilter, search, dateFrom, dateTo, createdFrom, createdTo]);
+  useEffect(() => { setPage(1); }, [stageFilter, assigneeFilter, sourceFilter, countryFilter, search, dateFrom, dateTo, createdFrom, createdTo]);
 
   useEffect(() => {
     if (!primaryRole) return;
@@ -215,6 +218,16 @@ export default function Leads() {
     return result.sort();
   }, [leads]);
 
+  // Unique countries (derived from each lead's phone number) for filter
+  const uniqueCountries = useMemo(() => {
+    const seen = new Map<string, string>(); // name -> flag
+    for (const l of leads) {
+      const country = getPhoneCountry(l.phone);
+      if (country && !seen.has(country.name)) seen.set(country.name, country.flag);
+    }
+    return [...seen.entries()].map(([name, flag]) => ({ name, flag })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [leads]);
+
   const filtered = useMemo(() => {
     const fromMs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toMs = dateTo ? new Date(dateTo + "T23:59:59").getTime() : null;
@@ -225,6 +238,7 @@ export default function Leads() {
         if (stageFilter !== "all" && l.pipeline_stage_id !== stageFilter) return false;
         if (assigneeFilter !== "all" && l.assigned_to_user_id !== assigneeFilter) return false;
         if (sourceFilter !== "all" && l.source !== sourceFilter) return false;
+        if (countryFilter !== "all" && getPhoneCountry(l.phone)?.name !== countryFilter) return false;
         if (fromMs !== null && new Date(l.updated_at).getTime() < fromMs) return false;
         if (toMs !== null && new Date(l.updated_at).getTime() > toMs) return false;
         if (cFromMs !== null && new Date(l.created_at).getTime() < cFromMs) return false;
@@ -237,7 +251,7 @@ export default function Leads() {
         return true;
       })
       .sort((a, b) => (recentStatusChanges.has(a.id) ? 1 : 0) - (recentStatusChanges.has(b.id) ? 1 : 0));
-  }, [leads, stageFilter, assigneeFilter, sourceFilter, search, dateFrom, dateTo, createdFrom, createdTo]);
+  }, [leads, stageFilter, assigneeFilter, sourceFilter, countryFilter, search, dateFrom, dateTo, createdFrom, createdTo]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -420,53 +434,154 @@ export default function Leads() {
           </div>
 
           {/* Status filter */}
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="w-[170px] h-9 rounded-xl">
-              <SelectValue placeholder="Të gjithë statuset" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Të gjithë statuset</SelectItem>
-              {stages.filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i).map((s) => (
-                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            className="w-[170px]"
+            value={stageFilter}
+            onValueChange={setStageFilter}
+            placeholder="Të gjithë statuset"
+            searchPlaceholder="Kërko statusin..."
+            options={[
+              { value: "all", label: "Të gjithë statuset" },
+              ...stages
+                .filter((s, i, arr) => arr.findIndex((x) => x.name === s.name) === i)
+                .map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
 
           {/* Operator filter */}
           {(canEdit || isSuperAdmin) && members.length > 0 && (
-            <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-              <SelectTrigger className="w-[170px] h-9 rounded-xl">
-                <SelectValue placeholder="Të gjithë operatorët" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Të gjithë operatorët</SelectItem>
-                {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.full_name || m.email}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              className="w-[200px]"
+              value={assigneeFilter}
+              onValueChange={setAssigneeFilter}
+              placeholder="Të gjithë operatorët"
+              searchPlaceholder="Kërko operatorin..."
+              options={[
+                { value: "all", label: "Të gjithë operatorët" },
+                ...members.map((m) => ({ value: m.id, label: m.full_name || m.email })),
+              ]}
+            />
           )}
 
           {/* Source filter */}
           {uniqueSources.length > 0 && (
-            <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger className="w-[150px] h-9 rounded-xl">
-                <SelectValue placeholder="Të gjitha burimet" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Të gjitha burimet</SelectItem>
-                {uniqueSources.map((src) => (
-                  <SelectItem key={src} value={src}>{src}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              className="w-[170px]"
+              value={sourceFilter}
+              onValueChange={setSourceFilter}
+              placeholder="Të gjitha burimet"
+              searchPlaceholder="Kërko burimin..."
+              options={[
+                { value: "all", label: "Të gjitha burimet" },
+                ...uniqueSources.map((src) => ({ value: src, label: src })),
+              ]}
+            />
           )}
 
+          {/* Country filter */}
+          {uniqueCountries.length > 0 && (
+            <SearchableSelect
+              className="w-[170px]"
+              value={countryFilter}
+              onValueChange={setCountryFilter}
+              placeholder="Të gjitha shtetet"
+              searchPlaceholder="Kërko shtetin..."
+              options={[
+                { value: "all", label: "Të gjitha shtetet" },
+                ...uniqueCountries.map((c) => ({ value: c.name, label: c.name, prefix: c.flag })),
+              ]}
+            />
+          )}
+
+          {/* Date-added range filter (time frame from/to) — same state as the column header's popover */}
+          <Popover open={createdBarFilterOpen} onOpenChange={setCreatedBarFilterOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 h-9 px-3 rounded-xl border text-sm font-medium transition-colors",
+                  (createdFrom || createdTo)
+                    ? "border-primary/40 bg-primary/5 text-primary"
+                    : "border-input bg-background text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <CalendarDays className="w-4 h-4" />
+                {createdFrom || createdTo
+                  ? <>
+                      {createdFrom ? fmtDate(createdFrom + "T12:00:00") : "…"}
+                      <span className="opacity-50">→</span>
+                      {createdTo ? fmtDate(createdTo + "T12:00:00") : "…"}
+                    </>
+                  : "Data e shtimit (nga - deri)"
+                }
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <div className="p-3 border-b border-border space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data e shtimit</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {([{ label: "Sot", key: "today" }] as const).map(({ label, key }) => {
+                    const p = datePresets()[key];
+                    const active = createdFrom === p.from && createdTo === p.to;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => { setCreatedFrom(p.from); setCreatedTo(p.to); }}
+                        className={cn(
+                          "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                          active
+                            ? "bg-foreground text-background border-foreground"
+                            : "bg-muted/50 border-border hover:bg-muted text-foreground"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <Calendar
+                mode="range"
+                selected={{
+                  from: createdFrom ? new Date(createdFrom + "T12:00:00") : undefined,
+                  to: createdTo ? new Date(createdTo + "T12:00:00") : undefined,
+                }}
+                onSelect={(range) => {
+                  setCreatedFrom(range?.from ? toISODate(range.from) : "");
+                  setCreatedTo(range?.to ? toISODate(range.to) : "");
+                }}
+                initialFocus
+                classNames={{ day_today: "font-normal" }}
+              />
+              <div className="p-3 border-t border-border flex items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">
+                  {createdFrom || createdTo
+                    ? <>
+                        {createdFrom && fmtDate(createdFrom + "T12:00:00")}
+                        {createdFrom && createdTo && <span className="mx-1 opacity-50">→</span>}
+                        {createdTo && fmtDate(createdTo + "T12:00:00")}
+                      </>
+                    : <span className="italic">Asnjë datë e zgjedhur</span>
+                  }
+                </span>
+                {(createdFrom || createdTo) && (
+                  <button
+                    onClick={() => { setCreatedFrom(""); setCreatedTo(""); setCreatedBarFilterOpen(false); }}
+                    className="text-xs text-destructive hover:underline shrink-0"
+                  >
+                    Pastro
+                  </button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           {/* Clear filters button — only when any filter is active */}
-          {(stageFilter !== "all" || assigneeFilter !== "all" || sourceFilter !== "all" || search || dateFrom || dateTo || createdFrom || createdTo) && (
+          {(stageFilter !== "all" || assigneeFilter !== "all" || sourceFilter !== "all" || countryFilter !== "all" || search || dateFrom || dateTo || createdFrom || createdTo) && (
             <Button
               variant="ghost"
               size="sm"
               className="h-9 rounded-xl text-muted-foreground hover:text-foreground gap-1.5"
-              onClick={() => { setStageFilter("all"); setAssigneeFilter("all"); setSourceFilter("all"); setSearchInput(""); setDateFrom(""); setDateTo(""); setCreatedFrom(""); setCreatedTo(""); }}
+              onClick={() => { setStageFilter("all"); setAssigneeFilter("all"); setSourceFilter("all"); setCountryFilter("all"); setSearchInput(""); setDateFrom(""); setDateTo(""); setCreatedFrom(""); setCreatedTo(""); }}
             >
               <X className="w-3.5 h-3.5" />Pastro
             </Button>
