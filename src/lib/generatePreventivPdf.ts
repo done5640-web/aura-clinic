@@ -318,16 +318,31 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
   // ── Table columns ── built right-to-left with generous fixed widths that comfortably
   // fit realistic clinic amounts (up to 6-figure totals) at large-print size; widened
   // further if a header label needs more room, and any outlier value that still doesn't
-  // fit gets its own font shrunk (via fitFontSize below) rather than overlapping.
+  // fit gets its own font shrunk (via fitFontSize below) rather than overlapping. The
+  // service column always keeps at least MIN_SERVICE_W — if long translated headers
+  // (e.g. Italian "QUANTITÀ") would otherwise starve it, the other four columns (and
+  // their header text) shrink proportionally instead.
   const COL_PAD = 14;
-  const qtyW = Math.max(50, w.widthOfText(t.qty, 15.5, true) + COL_PAD);
-  const priceW = Math.max(120, w.widthOfText(t.price, 15.5, true) + COL_PAD);
-  const discountW = hasDiscounts ? Math.max(105, w.widthOfText(t.discount, 15.5, true) + COL_PAD) : 0;
-  const totalW = Math.max(135, w.widthOfText(t.total, 15.5, true) + COL_PAD);
+  const HEADER_FONT = 15.5;
+  const MIN_SERVICE_W = 150;
+
+  let qtyW = Math.max(50, w.widthOfText(t.qty, HEADER_FONT, true) + COL_PAD);
+  let priceW = Math.max(120, w.widthOfText(t.price, HEADER_FONT, true) + COL_PAD);
+  let discountW = hasDiscounts ? Math.max(105, w.widthOfText(t.discount, HEADER_FONT, true) + COL_PAD) : 0;
+  let totalW = Math.max(135, w.widthOfText(t.total, HEADER_FONT, true) + COL_PAD);
 
   const TABLE_RIGHT_PAD = 10;
   const colService = MARGIN;
   const colTotalRight = MARGIN + contentW - TABLE_RIGHT_PAD;
+
+  const numericColsW = qtyW + priceW + discountW + totalW;
+  const availableForCols = contentW - TABLE_RIGHT_PAD - MIN_SERVICE_W - 8;
+  if (numericColsW > availableForCols && availableForCols > 0) {
+    const scale = availableForCols / numericColsW;
+    qtyW *= scale; priceW *= scale; discountW *= scale; totalW *= scale;
+  }
+  const headerFontSize = (label: string, colW: number) => fitFontSize(label, colW - COL_PAD, HEADER_FONT, true);
+
   const colDiscountRight = colTotalRight - totalW;
   const colUnitRight = hasDiscounts ? colDiscountRight - discountW : colTotalRight - totalW;
   const colQtyRight = colUnitRight - priceW;
@@ -335,11 +350,11 @@ export async function generatePreventivPdf(data: PreventivData): Promise<Uint8Ar
 
   const drawTableHeader = () => {
     w.rect(MARGIN, w.y - 11, contentW, 40, NAVY);
-    w.text(t.service, colService + 8, 15.5, { bold: true, color: WHITE });
-    w.textRight(t.qty, colQtyRight, 15.5, { bold: true, color: WHITE });
-    w.textRight(t.price, colUnitRight, 15.5, { bold: true, color: WHITE });
-    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, 15.5, { bold: true, color: WHITE });
-    w.textRight(t.total, colTotalRight, 15.5, { bold: true, color: WHITE });
+    w.text(t.service, colService + 8, HEADER_FONT, { bold: true, color: WHITE });
+    w.textRight(t.qty, colQtyRight, headerFontSize(t.qty, qtyW), { bold: true, color: WHITE });
+    w.textRight(t.price, colUnitRight, headerFontSize(t.price, priceW), { bold: true, color: WHITE });
+    if (hasDiscounts) w.textRight(t.discount, colDiscountRight, headerFontSize(t.discount, discountW), { bold: true, color: WHITE });
+    w.textRight(t.total, colTotalRight, headerFontSize(t.total, totalW), { bold: true, color: WHITE });
     w.y -= 40;
   };
 
