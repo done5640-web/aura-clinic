@@ -288,19 +288,22 @@ export default function Leads() {
   const clearSelection = () => setSelected(new Set());
 
   const bulkChangeStage = async (stageId: string) => {
-    await Promise.all([...selected].map((id) => supabase.from("leads").update({ pipeline_stage_id: stageId }).eq("id", id)));
-    selected.forEach(id => recentStatusChanges.add(id));
+    const ids = [...selected];
+    const { error } = await supabase.from("leads").update({ pipeline_stage_id: stageId }).in("id", ids);
+    if (error) { toast.error(error.message); return; }
+    ids.forEach(id => recentStatusChanges.add(id));
     setLeads(prev => [
       ...prev.filter(l => !selected.has(l.id)),
       ...prev.filter(l => selected.has(l.id)).map(l => ({ ...l, pipeline_stage_id: stageId })),
     ]);
-    toast.success(`Statusi u ndryshua për ${selected.size} pacientë`);
+    toast.success(`Statusi u ndryshua për ${ids.length} pacientë`);
     clearSelection();
   };
 
   const bulkAssign = async (userId: string) => {
     const ids = [...selected];
-    await Promise.all(ids.map((id) => supabase.from("leads").update({ assigned_to_user_id: userId }).eq("id", id)));
+    const { error } = await supabase.from("leads").update({ assigned_to_user_id: userId }).in("id", ids);
+    if (error) { toast.error(error.message); return; }
     setLeads(prev => prev.map(l => ids.includes(l.id) ? { ...l, assigned_to_user_id: userId } : l));
     toast.success(`${ids.length} pacientë u caktuan`);
     clearSelection();
@@ -308,7 +311,8 @@ export default function Leads() {
 
   const bulkDelete = async () => {
     const ids = [...selected];
-    await Promise.all(ids.map((id) => supabase.from("leads").delete().eq("id", id)));
+    const { error } = await supabase.from("leads").delete().in("id", ids);
+    if (error) { toast.error(error.message); return; }
     setLeads(prev => prev.filter(l => !ids.includes(l.id)));
     toast.success(`${ids.length} pacientë u fshinë`);
     clearSelection();
